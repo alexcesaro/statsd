@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testAddr = ":8126"
+	testAddr = ":0"
 	testKey  = "test_key"
 )
 
@@ -355,7 +355,7 @@ func testNetwork(t *testing.T, network string) {
 	})
 	defer server.Close()
 
-	c, err := New(testAddr,
+	c, err := New(server.addr,
 		WithNetwork(network), WithErrorHandler(expectNoError(t)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -372,6 +372,7 @@ func testNetwork(t *testing.T, network string) {
 
 type server struct {
 	t      testing.TB
+	addr   string
 	closer io.Closer
 	closed chan bool
 }
@@ -389,6 +390,7 @@ func newServer(t testing.TB, network, addr string, f func([]byte)) *server {
 			t.Fatal(err)
 		}
 		s.closer = conn
+		s.addr = conn.LocalAddr().String()
 		go func() {
 			buf := make([]byte, 1024)
 			for {
@@ -408,6 +410,7 @@ func newServer(t testing.TB, network, addr string, f func([]byte)) *server {
 			t.Fatal(err)
 		}
 		s.closer = ln
+		s.addr = ln.Addr().String()
 		go func() {
 			for {
 				conn, err := ln.Accept()
@@ -441,7 +444,7 @@ func (s *server) Close() {
 
 func Benchmark(b *testing.B) {
 	s := newServer(b, "udp", testAddr, func([]byte) {})
-	c, err := New(testAddr, WithFlushPeriod(0))
+	c, err := New(s.addr, WithFlushPeriod(0))
 	if err != nil {
 		b.Fatal(err)
 	}
