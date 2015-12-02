@@ -12,6 +12,7 @@ with other Go StatsD clients.
 ## Features
 
 - Supports all StatsD metrics: counter, gauge, timing and set
+- Supports Datadog and InfluxDB tags
 - Fast and GC-friendly: Client's methods do not allocate
 - Simple API
 - 100% test coverage

@@ -124,6 +124,28 @@ func TestPrefix(t *testing.T) {
 	}, WithPrefix("foo."))
 }
 
+func TestDatadogTags(t *testing.T) {
+	testOutput(t, "test_key:1|c|#tag1:value1,tag2,tag3:value3", func(c *Client) {
+		c.Increment(testKey)
+	}, WithDatadogTags("tag1:value1", "tag2", "tag3:value3"))
+}
+
+func TestInfluxDBTags(t *testing.T) {
+	testOutput(t, "test_key,key1=value1,key2=value2:1|c", func(c *Client) {
+		c.Increment(testKey)
+	}, WithInfluxDBTags("key1", "value1", "key2", "value2"))
+}
+
+func TestInfluxDBTagsPanic(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("WithInfluxDBTags should panic when only one argument is provided")
+		}
+	}()
+	New("", WithInfluxDBTags("key1"))
+}
+
 func TestErrorHandler(t *testing.T) {
 	errorCount := 0
 	testClient(t, func(c *Client) {

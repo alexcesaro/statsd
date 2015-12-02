@@ -1,6 +1,7 @@
 package statsd
 
 import (
+	"bytes"
 	"math/rand"
 	"net"
 	"strconv"
@@ -25,6 +26,8 @@ type Client struct {
 	maxPacketSize int
 	network       string
 	prefix        string
+	tagFormat     tagFormat
+	tags          string
 }
 
 // An Option represents an option for a Client. It must be used as an argument
@@ -81,6 +84,62 @@ func WithPrefix(prefix string) Option {
 		c.prefix = prefix
 	})
 }
+
+// WithDatadogTags sets the Datadog tags sent with every metrics.
+//
+// The tags should have the key:value syntax.
+// See http://docs.datadoghq.com/guides/metrics/#tags
+func WithDatadogTags(tags ...string) Option {
+	return Option(func(c *Client) {
+		// Datadog tag format: |#tag1:value1,tag2,tag3:value3
+		// See http://docs.datadoghq.com/guides/dogstatsd/#datagram-format
+		buf := bytes.NewBufferString("|#")
+		first := true
+		for i := 0; i < len(tags); i++ {
+			if first {
+				first = false
+			} else {
+				buf.WriteByte(',')
+			}
+			buf.WriteString(tags[i])
+		}
+		c.tagFormat = datadogFormat
+		c.tags = buf.String()
+	})
+}
+
+// WithInfluxDBTags sets the InfluxDB tags sent with every metrics.
+//
+// The tags must be set as key-value pairs. If the number of tags is not even,
+// WithTags panics.
+//
+// See https://influxdb.com/blog/2015/11/03/getting_started_with_influx_statsd.html
+func WithInfluxDBTags(tags ...string) Option {
+	if len(tags)%2 != 0 {
+		panic("statsd: WithInfluxDBTags only accepts an even number arguments")
+	}
+
+	// InfluxDB tag format: ,tag1=payroll,region=us-west
+	// https://influxdb.com/blog/2015/11/03/getting_started_with_influx_statsd.html
+	return Option(func(c *Client) {
+		var buf bytes.Buffer
+		for i := 0; i < len(tags)/2; i++ {
+			buf.WriteByte(',')
+			buf.WriteString(tags[2*i])
+			buf.WriteByte('=')
+			buf.WriteString(tags[2*i+1])
+		}
+		c.tagFormat = influxDBFormat
+		c.tags = buf.String()
+	})
+}
+
+type tagFormat uint8
+
+const (
+	datadogFormat tagFormat = iota + 1
+	influxDBFormat
+)
 
 // New creates a new Client with the given options.
 func New(addr string, options ...Option) (*Client, error) {
@@ -160,7 +219,7 @@ func (c *Client) Count(bucket string, n int, rate float32) {
 	c.appendInt(n)
 	c.appendType("c")
 	c.appendRate(rate)
-	c.appendByte('\n')
+	c.closeMetric()
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
@@ -218,7 +277,7 @@ func (c *Client) ChangeGauge(bucket string, delta int) {
 func (c *Client) gauge(value int) {
 	c.appendInt(value)
 	c.appendType("g")
-	c.appendByte('\n')
+	c.closeMetric()
 }
 
 // Timing sends a timing value to a bucket with the given sampling rate.
@@ -236,7 +295,7 @@ func (c *Client) Timing(bucket string, value int, rate float32) {
 	c.appendInt(value)
 	c.appendType("ms")
 	c.appendRate(rate)
-	c.appendByte('\n')
+	c.closeMetric()
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
@@ -274,7 +333,7 @@ func (c *Client) Unique(bucket string, value string) {
 	c.appendBucket(bucket)
 	c.appendString(value)
 	c.appendType("s")
-	c.appendByte('\n')
+	c.closeMetric()
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
@@ -320,6 +379,9 @@ func (c *Client) appendBucket(bucket string) {
 		c.appendString(c.prefix)
 	}
 	c.appendString(bucket)
+	if c.tagFormat == influxDBFormat {
+		c.appendString(c.tags)
+	}
 	c.appendByte(':')
 }
 
@@ -344,6 +406,13 @@ func (c *Client) appendRate(rate float32) {
 		c.rateCache[rate] = s
 		c.appendString(s)
 	}
+}
+
+func (c *Client) closeMetric() {
+	if c.tagFormat == datadogFormat {
+		c.appendString(c.tags)
+	}
+	c.appendByte('\n')
 }
 
 func (c *Client) flushIfBufferFull(lastSafeLen int) {

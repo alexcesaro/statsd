@@ -38,6 +38,10 @@ func ExampleMute() {
 	c.Increment("foo.bar") // Does nothing.
 }
 
+func ExampleWithDatadogTags() {
+	statsd.New(":8125", statsd.WithDatadogTags("region:us", "app:my_app"))
+}
+
 func ExampleWithErrorHandler() {
 	statsd.New(":8125", statsd.WithErrorHandler(func(err error) {
 		log.Print(err)
@@ -46,6 +50,10 @@ func ExampleWithErrorHandler() {
 
 func ExampleWithFlushPeriod() {
 	statsd.New(":8125", statsd.WithFlushPeriod(10*time.Millisecond))
+}
+
+func ExampleWithInfluxDBTags() {
+	statsd.New(":8125", statsd.WithInfluxDBTags("region", "us", "app", "my_app"))
 }
 
 func ExampleWithMaxPacketSize() {
