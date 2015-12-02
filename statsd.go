@@ -111,7 +111,7 @@ func WithDatadogTags(tags ...string) Option {
 // WithInfluxDBTags sets the InfluxDB tags sent with every metrics.
 //
 // The tags must be set as key-value pairs. If the number of tags is not even,
-// WithTags panics.
+// WithInfluxDBTags panics.
 //
 // See https://influxdb.com/blog/2015/11/03/getting_started_with_influx_statsd.html
 func WithInfluxDBTags(tags ...string) Option {
