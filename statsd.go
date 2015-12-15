@@ -398,7 +398,7 @@ func (c *Client) appendRate(rate float32) {
 		c.rateCache = make(map[float32]string)
 	}
 
-	c.appendByte('@')
+	c.appendString("|@")
 	if s, ok := c.rateCache[rate]; ok {
 		c.appendString(s)
 	} else {
