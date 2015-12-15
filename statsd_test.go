@@ -89,7 +89,7 @@ func TestUnique(t *testing.T) {
 }
 
 func TestSamplingRate(t *testing.T) {
-	testOutput(t, "test_key:3|c@0.6\ntest_key:4|ms@0.6", func(c *Client) {
+	testOutput(t, "test_key:3|c|@0.6\ntest_key:4|ms|@0.6", func(c *Client) {
 		randFloat = func() float32 { return 0.5 }
 		c.Count(testKey, 1, 0.2)
 		c.Timing(testKey, 2, 0.3)
