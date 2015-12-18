@@ -280,6 +280,26 @@ func (c *Client) gauge(value int) {
 	c.closeMetric()
 }
 
+// Histogram sends a histogram value to a bucket with the given sampling rate.
+func (c *Client) Histogram(bucket string, value int, rate float32) {
+	if c.muted {
+		return
+	}
+	if isRandAbove(rate) {
+		return
+	}
+
+	c.mu.Lock()
+	l := len(c.buf)
+	c.appendBucket(bucket)
+	c.appendInt(value)
+	c.appendType("h")
+	c.appendRate(rate)
+	c.closeMetric()
+	c.flushIfBufferFull(l)
+	c.mu.Unlock()
+}
+
 // Timing sends a timing value to a bucket with the given sampling rate.
 func (c *Client) Timing(bucket string, value int, rate float32) {
 	if c.muted {
