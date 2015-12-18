@@ -45,6 +45,12 @@ func TestChangeGauge(t *testing.T) {
 	})
 }
 
+func TestHistogram(t *testing.T) {
+	testOutput(t, "test_key:10|h", func(c *Client) {
+		c.Histogram(testKey, 10, 1)
+	})
+}
+
 func TestTiming(t *testing.T) {
 	testOutput(t, "test_key:6|ms", func(c *Client) {
 		c.Timing(testKey, 6, 1)
