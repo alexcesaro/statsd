@@ -146,6 +146,7 @@ const (
 // the error.
 func New(addr string, options ...Option) (*Client, error) {
 	c := &Client{
+		flushPeriod: 100 * time.Millisecond,
 		// Worst-case scenario:
 		// Ethernet MTU - IPv6 Header - TCP Header = 1500 - 40 - 20 = 1440
 		maxPacketSize: 1440,
@@ -177,10 +178,6 @@ func New(addr string, options ...Option) (*Client, error) {
 				return &Client{muted: true}, err
 			}
 		}
-	}
-
-	if c.flushPeriod == 0 {
-		c.flushPeriod = 100 * time.Millisecond
 	}
 
 	// To prevent a buffer overflow add some capacity to the buffer to allow for
