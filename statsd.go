@@ -141,7 +141,9 @@ const (
 	influxDBFormat
 )
 
-// New creates a new Client with the given options.
+// New returns a new Client with the given options. It returns an error only if
+// there is a network error. In this case, it returns a muted client along with
+// the error.
 func New(addr string, options ...Option) (*Client, error) {
 	c := &Client{
 		// Worst-case scenario:
@@ -163,7 +165,7 @@ func New(addr string, options ...Option) (*Client, error) {
 	var err error
 	c.conn, err = dialTimeout(c.network, addr, 5*time.Second)
 	if err != nil {
-		return nil, err
+		return &Client{muted: true}, err
 	}
 	// When using UDP do a quick check to see if something is listening on the
 	// given port to return an error as soon as possible.
@@ -172,7 +174,7 @@ func New(addr string, options ...Option) (*Client, error) {
 			_, err = c.conn.Write(nil)
 			if err != nil {
 				_ = c.conn.Close()
-				return nil, err
+				return &Client{muted: true}, err
 			}
 		}
 	}
