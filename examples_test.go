@@ -47,7 +47,7 @@ func Example() {
 	// Cloning a Client allows using different parameters while still using the
 	// same connection.
 	// This is way cheaper and more efficient than using New().
-	stat := c.Clone(statsd.Prefix("http"), SampleRate(0.2))
+	stat := c.Clone(statsd.Prefix("http"), statsd.SampleRate(0.2))
 	stat.Increment("view") // Increments http.view
 }
 
