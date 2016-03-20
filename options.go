@@ -101,7 +101,7 @@ func Mute(b bool) Option {
 // replaced but is prepended to the given prefix.
 func Prefix(p string) Option {
 	return Option(func(c *config) {
-		c.Client.Prefix += p + "."
+		c.Client.Prefix += strings.TrimSuffix(p, ".") + "."
 	})
 }
 
