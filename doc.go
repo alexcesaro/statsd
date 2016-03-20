@@ -1,9 +1,21 @@
 /*
 Package statsd is a simple and efficient StatsD client.
 
-Client's methods are fast and do not allocate memory.
 
-Internally, the Client buffers metrics. The buffer is flushed when either:
+Options
+
+Use options to configure the Client: target host/port, sampling rate, tags, etc.
+
+Whenever you want to use different options (e.g. other tags, different sampling
+rate), you should use the Clone() method of the Client.
+
+Because when cloning a Client, the same connection is reused so this is way
+cheaper and more efficient than creating another Client using New().
+
+
+Internals
+
+Client's methods buffer metrics. The buffer is flushed when either:
  - the background goroutine flushes the buffer (every 100ms by default)
  - the buffer is full (1440 bytes by default so that IP packets are not
    fragmented)

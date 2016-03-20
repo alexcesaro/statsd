@@ -16,8 +16,7 @@ var (
 func ping(url string) {}
 
 func Example() {
-	// Connect to the UDP port 8125 by default.
-	c, err := statsd.New()
+	c, err := statsd.New() // Connect to the UDP port 8125 by default.
 	if err != nil {
 		// If nothing is listening on the target port, an error is returned and
 		// the returned client does nothing but is still usable. So we can
@@ -44,6 +43,12 @@ func Example() {
 		ping("http://example.com/")
 	}
 	pingHomepage()
+
+	// Cloning a Client allows using different parameters while still using the
+	// same connection.
+	// This is way cheaper and more efficient than using New().
+	stat := c.Clone(statsd.Prefix("http"), SampleRate(0.2))
+	stat.Increment("view") // Increments http.view
 }
 
 func ExampleClient_Clone() {

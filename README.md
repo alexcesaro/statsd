@@ -14,6 +14,7 @@ with other Go StatsD clients.
 - Supports all StatsD metrics: counter, gauge, timing and set
 - Supports InfluxDB and Datadog tags
 - Fast and GC-friendly: all functions for sending metrics do not allocate
+- Efficient: metrics are buffered by default
 - Simple and clean API
 - 100% test coverage
 - Versioned API using gopkg.in
