@@ -179,19 +179,10 @@ func TestDatadogTags(t *testing.T) {
 	}, TagsFormat(Datadog), Tags("tag1", "value1", "tag2", "value2"))
 }
 
-func TestNoTagFormatPanic(t *testing.T) {
-	dialTimeout = mockDial
-	defer func() { dialTimeout = net.DialTimeout }()
-
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("Tags should panic when no tag format is set")
-		}
-	}()
-
-	New(Tags("tag1", "value1"))
-	t.Fatal("A panic should occur")
+func TestNoTagFormat(t *testing.T) {
+	testOutput(t, "test_key:1|c", func(c *Client) {
+		c.Increment(testKey)
+	}, Tags("tag1", "value1", "tag2", "value2"))
 }
 
 func TestOddTagsArgs(t *testing.T) {

@@ -2,7 +2,6 @@ package statsd
 
 import (
 	"bytes"
-	"errors"
 	"strings"
 	"time"
 )
@@ -128,7 +127,10 @@ func TagsFormat(tf TagFormat) Option {
 // already exists, it is replaced.
 //
 // The tags must be set as key-value pairs. If the number of tags is not even,
-// Tags panics. If also panics if the TagsFormat option has not been used.
+// Tags panics.
+//
+// If the format of tags have not been set using the TagsFormat option, the tags
+// will be ignored.
 func Tags(tags ...string) Option {
 	if len(tags)%2 != 0 {
 		panic("statsd: Tags only accepts an even number of arguments")
@@ -166,24 +168,16 @@ type tag struct {
 	K, V string
 }
 
-var (
-	errTagFormatNotSet = errors.New("statsd: tag format not set, please use " +
-		"the TagFormat option on the client")
-)
-
 func joinTags(tf TagFormat, tags []tag) string {
-	if len(tags) == 0 {
+	if len(tags) == 0 || tf == 0 {
 		return ""
-	}
-	if tf == 0 {
-		panic(errTagFormatNotSet)
 	}
 	join := joinFuncs[tf]
 	return join(tags)
 }
 
 func splitTags(tf TagFormat, tags string) []tag {
-	if len(tags) == 0 {
+	if len(tags) == 0 || tf == 0 {
 		return nil
 	}
 	split := splitFuncs[tf]
