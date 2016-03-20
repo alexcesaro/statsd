@@ -82,24 +82,24 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	return c, nil
 }
 
-func (c *conn) count(prefix, bucket string, n int, rate float32, tags string) {
+func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate float32, tags string) {
 	c.mu.Lock()
 	l := len(c.buf)
 	c.appendBucket(prefix, bucket, tags)
-	c.appendInt(n)
-	c.appendType("c")
+	c.appendNumber(n)
+	c.appendType(typ)
 	c.appendRate(rate)
 	c.closeMetric(tags)
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
 
-func (c *conn) gauge(prefix, bucket string, value int, tags string) {
+func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	c.mu.Lock()
 	l := len(c.buf)
 	// To set a gauge to a negative value we must first set it to 0.
 	// https://github.com/etsy/statsd/blob/master/docs/metric_types.md#gauges
-	if value < 0 {
+	if isNegative(value) {
 		c.appendBucket(prefix, bucket, tags)
 		c.appendGauge(0, tags)
 	}
@@ -109,34 +109,10 @@ func (c *conn) gauge(prefix, bucket string, value int, tags string) {
 	c.mu.Unlock()
 }
 
-func (c *conn) appendGauge(value int, tags string) {
-	c.appendInt(value)
+func (c *conn) appendGauge(value interface{}, tags string) {
+	c.appendNumber(value)
 	c.appendType("g")
 	c.closeMetric(tags)
-}
-
-func (c *conn) timing(prefix, bucket string, n int, rate float32, tags string) {
-	c.mu.Lock()
-	l := len(c.buf)
-	c.appendBucket(prefix, bucket, tags)
-	c.appendInt(n)
-	c.appendType("ms")
-	c.appendRate(rate)
-	c.closeMetric(tags)
-	c.flushIfBufferFull(l)
-	c.mu.Unlock()
-}
-
-func (c *conn) histogram(prefix, bucket string, n int, rate float32, tags string) {
-	c.mu.Lock()
-	l := len(c.buf)
-	c.appendBucket(prefix, bucket, tags)
-	c.appendInt(n)
-	c.appendType("h")
-	c.appendRate(rate)
-	c.closeMetric(tags)
-	c.flushIfBufferFull(l)
-	c.mu.Unlock()
 }
 
 func (c *conn) unique(prefix, bucket string, value string, tags string) {
@@ -158,8 +134,63 @@ func (c *conn) appendString(s string) {
 	c.buf = append(c.buf, s...)
 }
 
-func (c *conn) appendInt(i int) {
-	c.buf = strconv.AppendInt(c.buf, int64(i), 10)
+func (c *conn) appendNumber(v interface{}) {
+	switch n := v.(type) {
+	case int:
+		c.buf = strconv.AppendInt(c.buf, int64(n), 10)
+	case uint:
+		c.buf = strconv.AppendUint(c.buf, uint64(n), 10)
+	case int64:
+		c.buf = strconv.AppendInt(c.buf, n, 10)
+	case uint64:
+		c.buf = strconv.AppendUint(c.buf, n, 10)
+	case int32:
+		c.buf = strconv.AppendInt(c.buf, int64(n), 10)
+	case uint32:
+		c.buf = strconv.AppendUint(c.buf, uint64(n), 10)
+	case int16:
+		c.buf = strconv.AppendInt(c.buf, int64(n), 10)
+	case uint16:
+		c.buf = strconv.AppendUint(c.buf, uint64(n), 10)
+	case int8:
+		c.buf = strconv.AppendInt(c.buf, int64(n), 10)
+	case uint8:
+		c.buf = strconv.AppendUint(c.buf, uint64(n), 10)
+	case float64:
+		c.buf = strconv.AppendFloat(c.buf, n, 'f', -1, 64)
+	case float32:
+		c.buf = strconv.AppendFloat(c.buf, float64(n), 'f', -1, 32)
+	}
+}
+
+func isNegative(v interface{}) bool {
+	switch n := v.(type) {
+	case int:
+		return n < 0
+	case uint:
+		return n < 0
+	case int64:
+		return n < 0
+	case uint64:
+		return n < 0
+	case int32:
+		return n < 0
+	case uint32:
+		return n < 0
+	case int16:
+		return n < 0
+	case uint16:
+		return n < 0
+	case int8:
+		return n < 0
+	case uint8:
+		return n < 0
+	case float64:
+		return n < 0
+	case float32:
+		return n < 0
+	}
+	return false
 }
 
 func (c *conn) appendBucket(prefix, bucket string, tags string) {

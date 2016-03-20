@@ -49,6 +49,39 @@ func TestHistogram(t *testing.T) {
 	})
 }
 
+func TestNumbers(t *testing.T) {
+	testOutput(t,
+		"test_key:1|g\n"+
+			"test_key:1|g\n"+
+			"test_key:2|g\n"+
+			"test_key:2|g\n"+
+			"test_key:15|g\n"+
+			"test_key:15|g\n"+
+			"test_key:137|g\n"+
+			"test_key:137|g\n"+
+			"test_key:1|g\n"+
+			"test_key:1|g\n"+
+			"test_key:17.6|g\n"+
+			"test_key:0|g\n"+
+			"test_key:-42.5|g\n"+
+			"test_key:|g",
+		func(c *Client) {
+			c.Gauge(testKey, 1)
+			c.Gauge(testKey, uint(1))
+			c.Gauge(testKey, int64(2))
+			c.Gauge(testKey, uint64(2))
+			c.Gauge(testKey, int32(15))
+			c.Gauge(testKey, uint32(15))
+			c.Gauge(testKey, int16(137))
+			c.Gauge(testKey, uint16(137))
+			c.Gauge(testKey, int8(1))
+			c.Gauge(testKey, uint8(1))
+			c.Gauge(testKey, float64(17.6))
+			c.Gauge(testKey, float32(-42.5))
+			c.Gauge(testKey, "invalid")
+		})
+}
+
 func TestNewTiming(t *testing.T) {
 	i := 0
 	now = func() time.Time {
@@ -392,7 +425,7 @@ func testOutput(t *testing.T, want string, f func(*Client), options ...Option) {
 
 		got := getOutput(c)
 		if got != want {
-			t.Errorf("Invalid output, got %q, want %q", got, want)
+			t.Errorf("Invalid output, got:\n%q\nwant:\n%q", got, want)
 		}
 	}, options...)
 }
