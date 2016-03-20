@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/alexcesaro/statsd"
+	"gopkg.in/alexcesaro/statsd.v2"
 )
 
 var (

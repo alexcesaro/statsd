@@ -1,5 +1,5 @@
 # statsd
-[![Build Status](https://travis-ci.org/alexcesaro/statsd.svg?branch=v1)](https://travis-ci.org/alexcesaro/statsd) [![Code Coverage](http://gocover.io/_badge/gopkg.in/alexcesaro/statsd.v1)](http://gocover.io/gopkg.in/alexcesaro/statsd.v1) [![Documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v1?status.svg)](https://godoc.org/gopkg.in/alexcesaro/statsd.v1)
+[![Build Status](https://travis-ci.org/alexcesaro/statsd.svg?branch=v2)](https://travis-ci.org/alexcesaro/statsd) [![Code Coverage](http://gocover.io/_badge/gopkg.in/alexcesaro/statsd.v2)](http://gocover.io/gopkg.in/alexcesaro/statsd.v2) [![Documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2?status.svg)](https://godoc.org/gopkg.in/alexcesaro/statsd.v2)
 
 ## Introduction
 
@@ -22,17 +22,17 @@ with other Go StatsD clients.
 
 ## Documentation
 
-https://godoc.org/gopkg.in/alexcesaro/statsd.v1
+https://godoc.org/gopkg.in/alexcesaro/statsd.v2
 
 
 ## Download
 
-    go get gopkg.in/alexcesaro/statsd.v1
+    go get gopkg.in/alexcesaro/statsd.v2
 
 
 ## Example
 
-See the [examples in the documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v1#example-package).
+See the [examples in the documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2#example-package).
 
 
 ## License
