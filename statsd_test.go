@@ -119,22 +119,6 @@ func TestUnique(t *testing.T) {
 	})
 }
 
-func TestSamplingRateOK(t *testing.T) {
-	testOutput(t, "test_key:3|c|@0.6\ntest_key:4|ms|@0.6", func(c *Client) {
-		randFloat = func() float32 { return 0.5 }
-		c.Count(testKey, 3)
-		c.Timing(testKey, 4)
-	}, SampleRate(0.6))
-}
-
-func TestSamplingRateKO(t *testing.T) {
-	testOutput(t, "", func(c *Client) {
-		randFloat = func() float32 { return 0.5 }
-		c.Count(testKey, 1)
-		c.Timing(testKey, 2)
-	}, SampleRate(0.3))
-}
-
 func TestMute(t *testing.T) {
 	dialTimeout = func(string, string, time.Duration) (net.Conn, error) {
 		t.Fatal("net.Dial should not be called")
@@ -153,6 +137,22 @@ func TestMute(t *testing.T) {
 	c.Unique(testKey, "1")
 	c.Flush()
 	c.Close()
+}
+
+func TestSamplingRateOK(t *testing.T) {
+	testOutput(t, "test_key:3|c|@0.6\ntest_key:4|ms|@0.6", func(c *Client) {
+		randFloat = func() float32 { return 0.5 }
+		c.Count(testKey, 3)
+		c.Timing(testKey, 4)
+	}, SampleRate(0.6))
+}
+
+func TestSamplingRateKO(t *testing.T) {
+	testOutput(t, "", func(c *Client) {
+		randFloat = func() float32 { return 0.5 }
+		c.Count(testKey, 1)
+		c.Timing(testKey, 2)
+	}, SampleRate(0.3))
 }
 
 func TestPrefix(t *testing.T) {
@@ -196,7 +196,7 @@ func TestOddTagsArgs(t *testing.T) {
 		}
 	}()
 
-	New(TagsFormat(InfluxDB), Tags("tag1"))
+	_, _ = New(TagsFormat(InfluxDB), Tags("tag1"))
 	t.Fatal("A panic should occur")
 }
 

@@ -10,14 +10,6 @@ import (
 )
 
 type conn struct {
-	mu sync.Mutex
-
-	// Fields guarded by the mutex.
-	w         io.WriteCloser
-	buf       []byte
-	rateCache map[float32]string
-	closed    bool
-
 	// Fields settable with options at Client's creation.
 	addr          string
 	errorHandler  func(error)
@@ -25,6 +17,13 @@ type conn struct {
 	maxPacketSize int
 	network       string
 	tagFormat     TagFormat
+
+	mu sync.Mutex
+	// Fields guarded by the mutex.
+	closed    bool
+	w         io.WriteCloser
+	buf       []byte
+	rateCache map[float32]string
 }
 
 func newConn(conf connConfig, muted bool) (*conn, error) {

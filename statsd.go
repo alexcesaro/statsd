@@ -6,8 +6,8 @@ import "time"
 type Client struct {
 	conn   *conn
 	muted  bool
-	prefix string
 	rate   float32
+	prefix string
 	tags   string
 }
 
@@ -40,8 +40,8 @@ func New(opts ...Option) (*Client, error) {
 		c.muted = true
 		return c, err
 	}
-	c.prefix = conf.Client.Prefix
 	c.rate = conf.Client.Rate
+	c.prefix = conf.Client.Prefix
 	c.tags = joinTags(conf.Conn.TagFormat, conf.Client.Tags)
 	return c, nil
 }
@@ -55,8 +55,8 @@ func (c *Client) Clone(opts ...Option) *Client {
 	tf := c.conn.tagFormat
 	conf := &config{
 		Client: clientConfig{
-			Prefix: c.prefix,
 			Rate:   c.rate,
+			Prefix: c.prefix,
 			Tags:   splitTags(tf, c.tags),
 		},
 	}
@@ -67,8 +67,8 @@ func (c *Client) Clone(opts ...Option) *Client {
 	clone := &Client{
 		conn:   c.conn,
 		muted:  c.muted || conf.Client.Muted,
-		prefix: conf.Client.Prefix,
 		rate:   conf.Client.Rate,
+		prefix: conf.Client.Prefix,
 		tags:   joinTags(tf, conf.Client.Tags),
 	}
 	clone.conn = c.conn

@@ -7,15 +7,15 @@ import (
 )
 
 type config struct {
-	Client clientConfig
 	Conn   connConfig
+	Client clientConfig
 }
 
 type clientConfig struct {
 	Muted  bool
+	Rate   float32
 	Prefix string
 	Tags   []tag
-	Rate   float32
 }
 
 type connConfig struct {
@@ -95,6 +95,14 @@ func Mute(b bool) Option {
 	})
 }
 
+// SampleRate sets the sample rate of the Client. It allows sending the metrics
+// less often which can be useful for performance intensive code paths.
+func SampleRate(rate float32) Option {
+	return Option(func(c *config) {
+		c.Client.Rate = rate
+	})
+}
+
 // Prefix appends the prefix that will be used in every bucket name.
 //
 // Note that when used in cloned, the prefix of the parent Client is not
@@ -102,14 +110,6 @@ func Mute(b bool) Option {
 func Prefix(p string) Option {
 	return Option(func(c *config) {
 		c.Client.Prefix += strings.TrimSuffix(p, ".") + "."
-	})
-}
-
-// SampleRate sets the sample rate of the Client. It allows sending the metrics
-// less often which can be useful for performance intensive code paths.
-func SampleRate(rate float32) Option {
-	return Option(func(c *config) {
-		c.Client.Rate = rate
 	})
 }
 

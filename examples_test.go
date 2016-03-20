@@ -2,12 +2,18 @@ package statsd_test
 
 import (
 	"log"
-	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/alexcesaro/statsd"
 )
+
+var (
+	c   *statsd.Client
+	err error
+)
+
+func ping(url string) {}
 
 func Example() {
 	// Connect to the UDP port 8125 by default.
@@ -28,14 +34,14 @@ func Example() {
 
 	// Time something.
 	t := c.NewTiming()
-	http.Get("http://example.com/")
+	ping("http://example.com/")
 	t.Send("homepage.response_time")
 
 	// It can also be used as a one-liner to easily time a function.
 	pingHomepage := func() {
 		defer c.NewTiming().Send("homepage.response_time")
 
-		http.Get("http://example.com/")
+		ping("http://example.com/")
 	}
 	pingHomepage()
 }
@@ -51,30 +57,30 @@ func ExampleClient_Clone() {
 }
 
 func ExampleAddress() {
-	statsd.New(statsd.Address("192.168.0.5:8126"))
+	c, err = statsd.New(statsd.Address("192.168.0.5:8126"))
 }
 
 func ExampleErrorHandler() {
-	statsd.New(statsd.ErrorHandler(func(err error) {
+	c, err = statsd.New(statsd.ErrorHandler(func(err error) {
 		log.Print(err)
 	}))
 }
 
 func ExampleFlushPeriod() {
-	statsd.New(statsd.FlushPeriod(10 * time.Millisecond))
+	c, err = statsd.New(statsd.FlushPeriod(10 * time.Millisecond))
 }
 
 func ExampleMaxPacketSize() {
-	statsd.New(statsd.MaxPacketSize(512))
+	c, err = statsd.New(statsd.MaxPacketSize(512))
 }
 
 func ExampleNetwork() {
 	// Send metrics using a TCP connection.
-	statsd.New(statsd.Network("tcp"))
+	c, err = statsd.New(statsd.Network("tcp"))
 }
 
 func ExampleTagsFormat() {
-	statsd.New(statsd.TagsFormat(statsd.InfluxDB))
+	c, err = statsd.New(statsd.TagsFormat(statsd.InfluxDB))
 }
 
 func ExampleMute() {
@@ -85,6 +91,10 @@ func ExampleMute() {
 	c.Increment("foo.bar") // Does nothing.
 }
 
+func ExampleSampleRate() {
+	c, err = statsd.New(statsd.SampleRate(0.2)) // Send metrics 20% of the time.
+}
+
 func ExamplePrefix() {
 	c, err := statsd.New(statsd.Prefix("my_app"))
 	if err != nil {
@@ -93,21 +103,15 @@ func ExamplePrefix() {
 	c.Increment("foo.bar") // Increments: my_app.foo.bar
 }
 
-func ExampleSampleRate() {
-	statsd.New(statsd.SampleRate(0.2)) // Sends metrics 20% of the time.
-}
-
 func ExampleTags() {
-	statsd.New(
+	c, err = statsd.New(
 		statsd.TagsFormat(statsd.InfluxDB),
 		statsd.Tags("region", "us", "app", "my_app"),
 	)
 }
 
-var c *statsd.Client
-
 func ExampleClient_NewTiming() {
 	// Send a timing metric each time the function is run.
 	defer c.NewTiming().Send("homepage.response_time")
-	http.Get("http://example.com/")
+	ping("http://example.com/")
 }
