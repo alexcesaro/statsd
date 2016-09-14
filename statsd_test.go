@@ -336,10 +336,7 @@ func TestDialError(t *testing.T) {
 	}
 	defer func() { dialTimeout = net.DialTimeout }()
 
-	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
-	}
+	_, err := New()
 	if err == nil {
 		t.Error("New() did not return an error")
 	}
@@ -364,11 +361,11 @@ func TestUDPNotListening(t *testing.T) {
 	defer func() { dialTimeout = net.DialTimeout }()
 
 	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
+	if c.muted {
+		t.Error("client should not mute when attempting to connect to a non-listening port")
 	}
-	if err == nil {
-		t.Error("New should return an error")
+	if err != nil {
+		t.Error("attempting to connect to a non-listening port should not return an error")
 	}
 }
 
