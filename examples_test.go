@@ -62,7 +62,7 @@ func ExampleClient_Clone() {
 }
 
 func ExampleAddress() {
-	c, err = statsd.New(statsd.Address("192.168.0.5:8126"))
+	c, err = statsd.New(statsd.Address("192.168.0.5:8125"))
 }
 
 func ExampleErrorHandler() {
