@@ -161,6 +161,12 @@ func TestPrefix(t *testing.T) {
 	}, Prefix("foo"))
 }
 
+func TestAbsolutePrefix(t *testing.T) {
+	testOutput(t, "foo.test_key:1|c", func(c *Client) {
+		c.Increment(testKey)
+	}, AbsolutePrefix("foo"))
+}
+
 func TestNilTags(t *testing.T) {
 	testOutput(t, "test_key:1|c", func(c *Client) {
 		c.Increment(testKey)
@@ -306,6 +312,12 @@ func TestMuteClone(t *testing.T) {
 func TestClonePrefix(t *testing.T) {
 	testOutput(t, "app.http.test_key:5|c", func(c *Client) {
 		c.Clone(Prefix("http")).Count(testKey, 5)
+	}, Prefix("app"))
+}
+
+func TestCloneAbsolutePrefix(t *testing.T) {
+	testOutput(t, "http.test_key:5|c", func(c *Client) {
+		c.Clone(AbsolutePrefix("http")).Count(testKey, 5)
 	}, Prefix("app"))
 }
 

@@ -113,6 +113,20 @@ func Prefix(p string) Option {
 	})
 }
 
+// AbsolutePrefix defines the prefix that will be used in every bucket name.
+//
+// If this is used in conjunction with Prefix(...), the results will depend
+// on the ordering of the two options.
+//
+// Note that when used in cloned, the absolute prefix will override the prefix
+// of the parent Client.
+func AbsolutePrefix(p string) Option {
+	return Option(func(c *config) {
+		c.Client.Prefix = strings.TrimSuffix(p, ".") + "."
+	})
+}
+
+
 // TagFormat represents the format of tags sent by a Client.
 type TagFormat uint8
 
