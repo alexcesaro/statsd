@@ -1,6 +1,7 @@
 package statsd
 
 import (
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -89,6 +90,20 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.appendType(typ)
 	c.appendRate(rate)
 	c.closeMetric(tags)
+	c.flushIfBufferFull(l)
+	c.mu.Unlock()
+}
+
+func (c *conn) gaugeRelative(prefix, bucket string, value interface{}, tags string) {
+	c.mu.Lock()
+	l := len(c.buf)
+	c.appendBucket(prefix, bucket, tags)
+	if isNegative(value) {
+		c.appendNumber(value)
+	} else {
+		c.appendString(fmt.Sprintf("+%v", value))
+	}
+	c.appendType("g")
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
