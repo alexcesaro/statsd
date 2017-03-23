@@ -67,13 +67,12 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 			ticker := time.NewTicker(c.flushPeriod)
 			for _ = range ticker.C {
 				c.mu.Lock()
+				defer c.mu.Unlock()
 				if c.closed {
 					ticker.Stop()
-					c.mu.Unlock()
 					return
 				}
 				c.flush(0)
-				c.mu.Unlock()
 			}
 		}()
 	}
@@ -83,6 +82,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 
 func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate float32, tags string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	l := len(c.buf)
 	c.appendBucket(prefix, bucket, tags)
 	c.appendNumber(n)
@@ -90,11 +90,11 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.appendRate(rate)
 	c.closeMetric(tags)
 	c.flushIfBufferFull(l)
-	c.mu.Unlock()
 }
 
 func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	l := len(c.buf)
 	// To set a gauge to a negative value we must first set it to 0.
 	// https://github.com/etsy/statsd/blob/master/docs/metric_types.md#gauges
@@ -105,7 +105,6 @@ func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	c.appendBucket(prefix, bucket, tags)
 	c.appendGauge(value, tags)
 	c.flushIfBufferFull(l)
-	c.mu.Unlock()
 }
 
 func (c *conn) appendGauge(value interface{}, tags string) {
@@ -116,13 +115,13 @@ func (c *conn) appendGauge(value interface{}, tags string) {
 
 func (c *conn) unique(prefix, bucket string, value string, tags string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	l := len(c.buf)
 	c.appendBucket(prefix, bucket, tags)
 	c.appendString(value)
 	c.appendType("s")
 	c.closeMetric(tags)
 	c.flushIfBufferFull(l)
-	c.mu.Unlock()
 }
 
 func (c *conn) appendByte(b byte) {
