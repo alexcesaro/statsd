@@ -148,10 +148,10 @@ func Tags(tags ...string) Option {
 
 		for _, newTag := range newTags {
 			exists := false
-			for _, oldTag := range c.Client.Tags {
-				if newTag.K == oldTag.K {
+			for j, _ := range c.Client.Tags {
+				if newTag.K == c.Client.Tags[j].K {
 					exists = true
-					oldTag.V = newTag.V
+					c.Client.Tags[j].V = newTag.V
 				}
 			}
 			if !exists {
