@@ -166,30 +166,21 @@ func isNegative(v interface{}) bool {
 	switch n := v.(type) {
 	case int:
 		return n < 0
-	case uint:
-		return n < 0
 	case int64:
-		return n < 0
-	case uint64:
 		return n < 0
 	case int32:
 		return n < 0
-	case uint32:
-		return n < 0
 	case int16:
 		return n < 0
-	case uint16:
-		return n < 0
 	case int8:
-		return n < 0
-	case uint8:
 		return n < 0
 	case float64:
 		return n < 0
 	case float32:
 		return n < 0
+	default:
+		return false
 	}
-	return false
 }
 
 func (c *conn) appendBucket(prefix, bucket string, tags string) {
