@@ -406,6 +406,11 @@ func testClient(t *testing.T, f func(*Client), options ...Option) {
 		t.Fatalf("New: %v", err)
 	}
 
+	err = c.RefreshConn()
+	if err != nil {
+		t.Fatalf("Reconnect Conn: %v", err)
+	}
+
 	f(c)
 }
 
