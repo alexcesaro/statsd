@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"gopkg.in/alexcesaro/statsd.v2"
+	"github.com/SurfEasy/statsd-1"
 )
 
 var (
