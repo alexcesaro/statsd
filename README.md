@@ -1,5 +1,5 @@
 # statsd
-[![Build Status](https://travis-ci.org/alexcesaro/statsd.svg?branch=v2)](https://travis-ci.org/alexcesaro/statsd) [![Code Coverage](http://gocover.io/_badge/gopkg.in/alexcesaro/statsd.v2)](http://gocover.io/gopkg.in/alexcesaro/statsd.v2) [![Documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2?status.svg)](https://godoc.org/gopkg.in/alexcesaro/statsd.v2)
+[![Build Status](https://travis-ci.org/alexcesaro/statsd.svg?branch=v2)](https://travis-ci.org/alexcesaro/statsd) [![Code Coverage](http://gocover.io/_badge/github.com/SurfEasy/statsd-1)](http://gocover.io/github.com/SurfEasy/statsd-1) [![Documentation](https://godoc.org/github.com/SurfEasy/statsd-1?status.svg)](https://godoc.org/github.com/SurfEasy/statsd-1)
 
 ## Introduction
 
@@ -22,17 +22,17 @@ with other Go StatsD clients.
 
 ## Documentation
 
-https://godoc.org/gopkg.in/alexcesaro/statsd.v2
+https://godoc.org/github.com/SurfEasy/statsd-1
 
 
 ## Download
 
-    go get gopkg.in/alexcesaro/statsd.v2
+    go get github.com/SurfEasy/statsd-1
 
 
 ## Example
 
-See the [examples in the documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2#example-package).
+See the [examples in the documentation](https://godoc.org/github.com/SurfEasy/statsd-1#example-package).
 
 
 ## License
