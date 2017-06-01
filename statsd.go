@@ -1,6 +1,9 @@
 package statsd
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // A Client represents a StatsD client.
 type Client struct {
@@ -9,6 +12,8 @@ type Client struct {
 	rate   float32
 	prefix string
 	tags   string
+	conf   *config
+	sync.Mutex
 }
 
 // New returns a new Client.
@@ -40,10 +45,34 @@ func New(opts ...Option) (*Client, error) {
 		c.muted = true
 		return c, err
 	}
+	c.conf = conf
 	c.rate = conf.Client.Rate
 	c.prefix = conf.Client.Prefix
 	c.tags = joinTags(conf.Conn.TagFormat, conf.Client.Tags)
 	return c, nil
+}
+
+// RefreshConn clones the client and make a new call
+func (c *Client) RefreshConn() error {
+	c.Lock()
+	defer c.Unlock()
+
+	var err error
+
+	usedConn := c.conn
+	// Reusing the same object
+	c.conn, err = newConn(c.conf.Conn, c.conf.Client.Muted)
+	if err == nil {
+		// Close old connection
+		usedConn.mu.Lock()
+		usedConn.flush(0)
+		if usedConn.w != nil {
+			usedConn.handleError(usedConn.w.Close())
+		}
+		usedConn.closed = true
+		usedConn.mu.Unlock()
+	}
+	return err
 }
 
 // Clone returns a clone of the Client. The cloned Client inherits its
