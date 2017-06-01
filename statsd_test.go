@@ -591,3 +591,9 @@ func Benchmark(b *testing.B) {
 	c.Close()
 	serv.Close()
 }
+
+// GetTestOutPut exposes client key and value for testing
+// your functions only
+func GetTestOutPut(c *Client) string {
+	return getOutput(c)
+}
