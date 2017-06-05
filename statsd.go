@@ -75,6 +75,11 @@ func (c *Client) Clone(opts ...Option) *Client {
 	return clone
 }
 
+// Muted tells whether this Client is muted or not.
+func (c *Client) Muted() bool {
+	return c.muted
+}
+
 // Count adds n to bucket.
 func (c *Client) Count(bucket string, n interface{}) {
 	if c.skip() {
