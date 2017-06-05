@@ -105,6 +105,9 @@ func (c *Client) Timing(bucket string, value interface{}) {
 	if c.skip() {
 		return
 	}
+	if v, ok := value.(time.Duration); ok {
+		value = int64(v / time.Millisecond)
+	}
 	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tags)
 }
 
@@ -129,7 +132,7 @@ func (c *Client) NewTiming() Timing {
 
 // Send sends the time elapsed since the creation of the Timing.
 func (t Timing) Send(bucket string) {
-	t.c.Timing(bucket, int(t.Duration()/time.Millisecond))
+	t.c.Timing(bucket, t.Duration())
 }
 
 // Duration returns the time elapsed since the creation of the Timing.
