@@ -195,7 +195,7 @@ func isNegative(v interface{}) bool {
 func (c *conn) appendBucket(prefix, bucket string, tags string) {
 	c.appendString(prefix)
 	c.appendString(bucket)
-	if c.tagFormat == InfluxDB {
+	if c.tagFormat == InfluxDB || c.tagFormat == Librato {
 		c.appendString(tags)
 	}
 	c.appendByte(':')
