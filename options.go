@@ -191,6 +191,7 @@ const (
 	// Datadog tag format.
 	// See http://docs.datadoghq.com/guides/metrics/#tags
 	Datadog
+	Librato
 )
 
 var (
@@ -224,6 +225,20 @@ var (
 			}
 			return buf.String()
 		},
+		Librato: func(tags []tag) string {
+			var buf bytes.Buffer
+			for i, tag := range tags {
+				if i == 0 {
+					_ = buf.WriteByte('#')
+				} else {
+					_ = buf.WriteByte(',')
+				}
+				_, _ = buf.WriteString(tag.K)
+				_ = buf.WriteByte('=')
+				_, _ = buf.WriteString(tag.V)
+			}
+			return buf.String()
+		},
 	}
 	splitFuncs = map[TagFormat]func(string) []tag{
 		InfluxDB: func(s string) []tag {
@@ -238,6 +253,16 @@ var (
 		},
 		Datadog: func(s string) []tag {
 			s = s[2:]
+			pairs := strings.Split(s, ",")
+			tags := make([]tag, len(pairs))
+			for i, pair := range pairs {
+				kv := strings.Split(pair, ":")
+				tags[i] = tag{K: kv[0], V: kv[1]}
+			}
+			return tags
+		},
+		Librato: func(s string) []tag {
+			s = s[1:]
 			pairs := strings.Split(s, ",")
 			tags := make([]tag, len(pairs))
 			for i, pair := range pairs {
