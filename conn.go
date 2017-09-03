@@ -247,13 +247,12 @@ func (c *conn) flush(n int) {
 		n = len(c.buf)
 	}
 
-	// Trim the last \n, StatsD does not like it.
-	_, err := c.w.Write(c.buf[:n-1])
+	total, err := c.w.Write(c.buf[:n])
 	c.handleError(err)
-	if n < len(c.buf) {
-		copy(c.buf, c.buf[n:])
+	if total < len(c.buf) {
+		copy(c.buf, c.buf[total:])
 	}
-	c.buf = c.buf[:len(c.buf)-n]
+	c.buf = c.buf[:len(c.buf)-total]
 }
 
 func (c *conn) handleError(err error) {
