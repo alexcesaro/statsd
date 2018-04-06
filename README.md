@@ -6,6 +6,8 @@
 statsd is a simple and efficient [Statsd](https://github.com/etsy/statsd)
 client.
 
+This is a fork of a [dead statsd client project](https://github.com/alexcesaro/statsd) with various impprovements.
+
 See the [benchmark](https://github.com/alexcesaro/statsdbench) for a comparison
 with other Go StatsD clients.
 
@@ -27,7 +29,7 @@ https://godoc.org/gopkg.in/alexcesaro/statsd.v2
 
 ## Download
 
-    go get gopkg.in/alexcesaro/statsd.v2
+    go get github.com/multiplay/statsd
 
 
 ## Example
