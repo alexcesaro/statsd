@@ -373,6 +373,10 @@ func TestUDPNotListening(t *testing.T) {
 	if err != nil {
 		t.Errorf("New() should not have returned an error, got %v", err)
 	}
+
+	if c.muted {
+		t.Error("New() should not have returned a muted client")
+	}
 }
 
 type mockClosedUDPConn struct {
