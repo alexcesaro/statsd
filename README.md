@@ -15,7 +15,6 @@ This features some additions to gauges and listener-less client startup.
 - Fast and GC-friendly: all functions for sending metrics do not allocate
 - Efficient: metrics are buffered by default
 - Simple and clean API
-- 100% test coverage
 
 ## Download
 
