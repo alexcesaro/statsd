@@ -46,18 +46,6 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	if err != nil {
 		return c, err
 	}
-	// When using UDP do a quick check to see if something is listening on the
-	// given port to return an error as soon as possible.
-	if c.network[:3] == "udp" {
-		for i := 0; i < 2; i++ {
-			_, err = c.w.Write(nil)
-			if err != nil {
-				_ = c.w.Close()
-				c.w = nil
-				return c, err
-			}
-		}
-	}
 
 	// To prevent a buffer overflow add some capacity to the buffer to allow for
 	// an additional metric.
