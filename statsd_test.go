@@ -384,7 +384,7 @@ type mockClosedUDPConn struct {
 	net.PacketConn
 }
 
-func (c *mockClosedUDPConn) Write(p []byte) (int, error) {
+func (c *mockClosedUDPConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 	c.i++
 	if c.i == 2 {
 		return 0, errors.New("test error")
