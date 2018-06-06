@@ -1,6 +1,7 @@
 package statsd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -41,11 +42,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 		return c, nil
 	}
 
-	var err error
-	c.w, err = dialTimeout(c.network, c.addr, 5*time.Second)
-	if err != nil {
-		return c, err
-	}
+	c.w = newWriteCloseDialler(c.network, c.addr, 5*time.Second)
 
 	// To prevent a buffer overflow add some capacity to the buffer to allow for
 	// an additional metric.
@@ -54,7 +51,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	if c.flushPeriod > 0 {
 		go func() {
 			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.mu.Lock()
 				if c.closed {
 					ticker.Stop()
@@ -258,6 +255,82 @@ func (c *conn) handleError(err error) {
 	if err != nil && c.errorHandler != nil {
 		c.errorHandler(err)
 	}
+}
+
+func lazyDial(net, addr string, timeout time.Duration) net.Conn {
+	conn, err := dialTimeout(net, addr, timeout)
+	if err != nil {
+		return nil
+	}
+
+	return conn
+}
+
+type writeCloseDialler struct {
+	net     string
+	addr    string
+	timeout time.Duration
+
+	connMu *sync.Mutex
+	conn   net.Conn
+	trying bool
+	closed bool
+}
+
+func newWriteCloseDialler(net, addr string, timeout time.Duration) io.WriteCloser {
+	return &writeCloseDialler{
+		net:     net,
+		addr:    addr,
+		timeout: timeout,
+		connMu:  new(sync.Mutex),
+		conn:    lazyDial(net, addr, timeout),
+	}
+}
+
+func (w *writeCloseDialler) Write(p []byte) (int, error) {
+	w.connMu.Lock()
+	defer w.connMu.Unlock()
+
+	if w.closed {
+		return 0, errors.New("writeCloseDialler already closed")
+	}
+
+	if w.conn == nil && !w.trying {
+		w.trying = true
+		go func() {
+			c := lazyDial(w.net, w.addr, w.timeout)
+
+			w.connMu.Lock()
+			w.conn = c
+			w.trying = false
+			w.connMu.Unlock()
+		}()
+	}
+
+	if w.conn == nil {
+		return 0, nil
+	}
+
+	n, err := w.conn.Write(p)
+	if err != nil {
+		_ = w.conn.Close()
+		w.conn = nil
+	}
+
+	return n, err
+}
+
+func (w *writeCloseDialler) Close() error {
+	w.connMu.Lock()
+	defer w.connMu.Unlock()
+
+	w.closed = true
+
+	if w.conn != nil {
+		return w.conn.Close()
+	}
+
+	return nil
 }
 
 // Stubbed out for testing.

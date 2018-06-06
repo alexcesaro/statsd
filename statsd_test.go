@@ -212,8 +212,8 @@ func TestErrorHandler(t *testing.T) {
 		getBuffer(c).err = errors.New("test error")
 		c.Increment(testKey)
 		c.Close()
-		if errorCount != 2 {
-			t.Errorf("Wrong error count, got %d, want 2", errorCount)
+		if errorCount != 1 {
+			t.Errorf("Wrong error count, got %d, want 1", errorCount)
 		}
 	}, ErrorHandler(func(err error) {
 		if err == nil {
@@ -343,11 +343,11 @@ func TestDialError(t *testing.T) {
 	defer func() { dialTimeout = net.DialTimeout }()
 
 	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
+	if c == nil || c.muted {
+		t.Error("New() did return a muted client")
 	}
-	if err == nil {
-		t.Error("New() did not return an error")
+	if err != nil {
+		t.Error("New() did return an error")
 	}
 }
 
@@ -452,7 +452,11 @@ func (c *testBuffer) Close() error {
 }
 
 func getBuffer(c *Client) *testBuffer {
-	if mock, ok := c.conn.w.(*testBuffer); ok {
+	wcd, ok := c.conn.w.(*writeCloseDialler)
+	if !ok {
+		return nil
+	}
+	if mock, ok := wcd.conn.(*testBuffer); ok {
 		return mock
 	}
 	return nil

@@ -1,6 +1,8 @@
 package statsd
 
-import "time"
+import (
+	"time"
+)
 
 // A Client represents a StatsD client.
 type Client struct {
