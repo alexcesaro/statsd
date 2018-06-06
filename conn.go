@@ -42,7 +42,11 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 		return c, nil
 	}
 
-	c.w = newWriteCloseDialler(c.network, c.addr, 5*time.Second)
+	var err error
+	c.w, err = newWriteCloser(c.network, c.addr, 5*time.Second)
+	if err != nil {
+		return c, err
+	}
 
 	// To prevent a buffer overflow add some capacity to the buffer to allow for
 	// an additional metric.
@@ -257,85 +261,52 @@ func (c *conn) handleError(err error) {
 	}
 }
 
-func lazyDial(net, addr string, timeout time.Duration) net.Conn {
-	conn, err := dialTimeout(net, addr, timeout)
-	if err != nil {
-		return nil
-	}
+type writeCloser struct {
+	udpAddr net.Addr
 
-	return conn
-}
-
-type writeCloseDialler struct {
-	net     string
-	addr    string
-	timeout time.Duration
-
-	connMu *sync.Mutex
-	conn   net.Conn
-	trying bool
+	conn   net.PacketConn
 	closed bool
 }
 
-func newWriteCloseDialler(net, addr string, timeout time.Duration) io.WriteCloser {
-	return &writeCloseDialler{
-		net:     net,
-		addr:    addr,
-		timeout: timeout,
-		connMu:  new(sync.Mutex),
-		conn:    lazyDial(net, addr, timeout),
+func newWriteCloser(network, addr string, timeout time.Duration) (io.WriteCloser, error) {
+	c, err := listenPacket(network, "")
+	if err != nil {
+		return nil, err
 	}
+
+	udpAddr, err := net.ResolveUDPAddr(network, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &writeCloser{
+		udpAddr: udpAddr,
+		conn:    c,
+	}, nil
 }
 
-func (w *writeCloseDialler) Write(p []byte) (int, error) {
-	w.connMu.Lock()
-	defer w.connMu.Unlock()
-
+func (w *writeCloser) Write(p []byte) (int, error) {
 	if w.closed {
-		return 0, errors.New("writeCloseDialler already closed")
+		return 0, errors.New("writeCloser already closed")
 	}
 
-	if w.conn == nil && !w.trying {
-		w.trying = true
-		go func() {
-			c := lazyDial(w.net, w.addr, w.timeout)
-
-			w.connMu.Lock()
-			w.conn = c
-			w.trying = false
-			w.connMu.Unlock()
-		}()
-	}
-
-	if w.conn == nil {
-		return 0, nil
-	}
-
-	n, err := w.conn.Write(p)
+	n, err := w.conn.WriteTo(p, w.udpAddr)
 	if err != nil {
-		_ = w.conn.Close()
-		w.conn = nil
+		return 0, err
 	}
 
 	return n, err
 }
 
-func (w *writeCloseDialler) Close() error {
-	w.connMu.Lock()
-	defer w.connMu.Unlock()
-
+func (w *writeCloser) Close() error {
 	w.closed = true
 
-	if w.conn != nil {
-		return w.conn.Close()
-	}
-
-	return nil
+	return w.conn.Close()
 }
 
 // Stubbed out for testing.
 var (
-	dialTimeout = net.DialTimeout
-	now         = time.Now
-	randFloat   = rand.Float32
+	listenPacket = net.ListenPacket
+	now          = time.Now
+	randFloat    = rand.Float32
 )
