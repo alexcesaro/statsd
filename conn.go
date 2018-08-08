@@ -1,6 +1,7 @@
 package statsd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -42,7 +43,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	}
 
 	var err error
-	c.w, err = dialTimeout(c.network, c.addr, 5*time.Second)
+	c.w, err = newWriteCloser(c.network, c.addr, 5*time.Second)
 	if err != nil {
 		return c, err
 	}
@@ -54,7 +55,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	if c.flushPeriod > 0 {
 		go func() {
 			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.mu.Lock()
 				if c.closed {
 					ticker.Stop()
@@ -260,9 +261,52 @@ func (c *conn) handleError(err error) {
 	}
 }
 
+type writeCloser struct {
+	udpAddr net.Addr
+
+	conn   net.PacketConn
+	closed bool
+}
+
+func newWriteCloser(network, addr string, timeout time.Duration) (io.WriteCloser, error) {
+	c, err := listenPacket(network, "")
+	if err != nil {
+		return nil, err
+	}
+
+	udpAddr, err := net.ResolveUDPAddr(network, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &writeCloser{
+		udpAddr: udpAddr,
+		conn:    c,
+	}, nil
+}
+
+func (w *writeCloser) Write(p []byte) (int, error) {
+	if w.closed {
+		return 0, errors.New("writeCloser already closed")
+	}
+
+	n, err := w.conn.WriteTo(p, w.udpAddr)
+	if err != nil {
+		return 0, err
+	}
+
+	return n, err
+}
+
+func (w *writeCloser) Close() error {
+	w.closed = true
+
+	return w.conn.Close()
+}
+
 // Stubbed out for testing.
 var (
-	dialTimeout = net.DialTimeout
-	now         = time.Now
-	randFloat   = rand.Float32
+	listenPacket = net.ListenPacket
+	now          = time.Now
+	randFloat    = rand.Float32
 )
