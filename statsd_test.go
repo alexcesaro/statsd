@@ -43,6 +43,12 @@ func TestTiming(t *testing.T) {
 	})
 }
 
+func TestTimingDuration(t *testing.T) {
+	testOutput(t, "test_key:7|ms", func(c *Client) {
+		c.Timing(testKey, time.Duration(7*time.Millisecond))
+	})
+}
+
 func TestHistogram(t *testing.T) {
 	testOutput(t, "test_key:17|h", func(c *Client) {
 		c.Histogram(testKey, 17)
@@ -120,11 +126,11 @@ func TestUnique(t *testing.T) {
 }
 
 func TestMute(t *testing.T) {
-	dialTimeout = func(string, string, time.Duration) (net.Conn, error) {
+	listenPacket = func(string, string) (net.PacketConn, error) {
 		t.Fatal("net.Dial should not be called")
 		return nil, nil
 	}
-	defer func() { dialTimeout = net.DialTimeout }()
+	defer func() { listenPacket = net.ListenPacket }()
 
 	c, err := New(Mute(true))
 	if err != nil {
@@ -186,8 +192,8 @@ func TestNoTagFormat(t *testing.T) {
 }
 
 func TestOddTagsArgs(t *testing.T) {
-	dialTimeout = mockDial
-	defer func() { dialTimeout = net.DialTimeout }()
+	listenPacket = mockListenPacket
+	defer func() { listenPacket = net.ListenPacket }()
 
 	defer func() {
 		r := recover()
@@ -317,24 +323,24 @@ func TestCloneRate(t *testing.T) {
 }
 
 func TestCloneInfluxDBTags(t *testing.T) {
-	testOutput(t, "test_key,tag1=value1,tag2=value2:5|c", func(c *Client) {
+	testOutput(t, "test_key,tag1=value3,tag2=value2:5|c", func(c *Client) {
 		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
 		clone.Count(testKey, 5)
 	}, TagsFormat(InfluxDB), Tags("tag1", "value1"))
 }
 
 func TestCloneDatadogTags(t *testing.T) {
-	testOutput(t, "test_key:5|c|#tag1:value1,tag2:value2", func(c *Client) {
+	testOutput(t, "test_key:5|c|#tag1:value3,tag2:value2", func(c *Client) {
 		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
 		clone.Count(testKey, 5)
 	}, TagsFormat(Datadog), Tags("tag1", "value1"))
 }
 
 func TestDialError(t *testing.T) {
-	dialTimeout = func(string, string, time.Duration) (net.Conn, error) {
+	listenPacket = func(string, string) (net.PacketConn, error) {
 		return nil, errors.New("")
 	}
-	defer func() { dialTimeout = net.DialTimeout }()
+	defer func() { listenPacket = net.ListenPacket }()
 
 	c, err := New()
 	if c == nil || !c.muted {
@@ -360,24 +366,25 @@ func TestConcurrency(t *testing.T) {
 }
 
 func TestUDPNotListening(t *testing.T) {
-	dialTimeout = mockUDPClosed
-	defer func() { dialTimeout = net.DialTimeout }()
+	listenPacket = mockUDPClosed
+	defer func() { listenPacket = net.ListenPacket }()
 
 	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
+	if err != nil {
+		t.Errorf("New() should not have returned an error, got %v", err)
 	}
-	if err == nil {
-		t.Error("New should return an error")
+
+	if c.muted {
+		t.Error("New() should not have returned a muted client")
 	}
 }
 
 type mockClosedUDPConn struct {
 	i int
-	net.Conn
+	net.PacketConn
 }
 
-func (c *mockClosedUDPConn) Write(p []byte) (int, error) {
+func (c *mockClosedUDPConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 	c.i++
 	if c.i == 2 {
 		return 0, errors.New("test error")
@@ -389,13 +396,13 @@ func (c *mockClosedUDPConn) Close() error {
 	return nil
 }
 
-func mockUDPClosed(string, string, time.Duration) (net.Conn, error) {
+func mockUDPClosed(string, string) (net.PacketConn, error) {
 	return &mockClosedUDPConn{}, nil
 }
 
 func testClient(t *testing.T, f func(*Client), options ...Option) {
-	dialTimeout = mockDial
-	defer func() { dialTimeout = net.DialTimeout }()
+	listenPacket = mockListenPacket
+	defer func() { listenPacket = net.ListenPacket }()
 
 	options = append([]Option{
 		FlushPeriod(0),
@@ -430,10 +437,10 @@ func expectNoError(t *testing.T) func(error) {
 type testBuffer struct {
 	buf bytes.Buffer
 	err error
-	net.Conn
+	net.PacketConn
 }
 
-func (c *testBuffer) Write(p []byte) (int, error) {
+func (c *testBuffer) WriteTo(p []byte, addr net.Addr) (int, error) {
 	if c.err != nil {
 		return 0, c.err
 	}
@@ -445,7 +452,11 @@ func (c *testBuffer) Close() error {
 }
 
 func getBuffer(c *Client) *testBuffer {
-	if mock, ok := c.conn.w.(*testBuffer); ok {
+	wc, ok := c.conn.w.(*writeCloser)
+	if !ok {
+		return nil
+	}
+	if mock, ok := wc.conn.(*testBuffer); ok {
 		return mock
 	}
 	return nil
@@ -458,16 +469,12 @@ func getOutput(c *Client) string {
 	return getBuffer(c).buf.String()
 }
 
-func mockDial(string, string, time.Duration) (net.Conn, error) {
+func mockListenPacket(string, string) (net.PacketConn, error) {
 	return &testBuffer{}, nil
 }
 
 func TestUDP(t *testing.T) {
 	testNetwork(t, "udp")
-}
-
-func TestTCP(t *testing.T) {
-	testNetwork(t, "tcp")
 }
 
 func testNetwork(t *testing.T, network string) {
