@@ -2,6 +2,7 @@ package statsd
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"time"
 )
@@ -25,6 +26,7 @@ type connConfig struct {
 	MaxPacketSize int
 	Network       string
 	TagFormat     TagFormat
+	CustomConn    io.WriteCloser
 }
 
 // An Option represents an option for a Client. It must be used as an
@@ -81,6 +83,13 @@ func MaxPacketSize(n int) Option {
 func Network(network string) Option {
 	return Option(func(c *config) {
 		c.Conn.Network = network
+	})
+}
+
+// CustomConn sets custom network connection. Suitable for mock client.
+func CustomConn(conn io.WriteCloser) Option {
+	return Option(func(c *config) {
+		c.Conn.CustomConn = conn
 	})
 }
 
