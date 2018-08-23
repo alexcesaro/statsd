@@ -113,6 +113,21 @@ func Prefix(p string) Option {
 	})
 }
 
+// PrefixUnsafe appends the prefix that will be used in every bucket name.
+// This func is "unsafe" because it doesn't attempt to normalize the prepend
+// of the prefix by ensuring only a single separator character exists
+// between the prefix and the suffix. Instead the onus for this check is
+// placed upon the caller. This allows for prefixes to be added WITHOUT the
+// automatic insertion of separator characters.
+//
+// Note that when used in cloned, the prefix of the parent Client is not
+// replaced but is prepended to the given prefix.
+func PrefixUnsafe(p string) Option {
+	return Option(func(c *config) {
+		c.Client.Prefix += p
+	})
+}
+
 // TagFormat represents the format of tags sent by a Client.
 type TagFormat uint8
 
