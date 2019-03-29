@@ -116,6 +116,20 @@ func (c *Client) Histogram(bucket string, value interface{}) {
 	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tags)
 }
 
+func (c *Client) Scaled(bucket string, value interface{}) {
+	if c.skip() {
+		return
+	}
+	c.conn.metric(c.prefix, bucket, value, "s", c.rate, c.tags)
+}
+
+func (c *Client) FloatingPoint(bucket string, value interface{}) {
+	if c.skip() {
+		return
+	}
+	c.conn.metric(c.prefix, bucket, value, "f", c.rate, c.tags)
+}
+
 // A Timing is an helper object that eases sending timing values.
 type Timing struct {
 	start time.Time

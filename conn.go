@@ -156,9 +156,9 @@ func (c *conn) appendNumber(v interface{}) {
 	case uint8:
 		c.buf = strconv.AppendUint(c.buf, uint64(n), 10)
 	case float64:
-		c.buf = strconv.AppendFloat(c.buf, n, 'f', -1, 64)
+		c.buf = strconv.AppendFloat(c.buf, n, 'e', -1, 64)
 	case float32:
-		c.buf = strconv.AppendFloat(c.buf, float64(n), 'f', -1, 32)
+		c.buf = strconv.AppendFloat(c.buf, float64(n), 'e', -1, 32)
 	}
 }
 
