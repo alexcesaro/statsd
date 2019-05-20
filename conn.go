@@ -10,29 +10,27 @@ import (
 )
 
 type conn struct {
-	// Fields settable with options at Client's creation.
-	addr          string
-	errorHandler  func(error)
-	flushPeriod   time.Duration
-	maxPacketSize int
-	network       string
-	tagFormat     TagFormat
+	// config
 
-	mu sync.Mutex
-	// Fields guarded by the mutex.
-	closed    bool
-	w         io.WriteCloser
-	buf       []byte
-	rateCache map[float32]string
+	errorHandler  func(error)   // errorHandler may be provided by the user
+	flushPeriod   time.Duration // flushPeriod may be provided by the user
+	maxPacketSize int           // maxPacketSize may be provided by the user and has a sensible default
+	tagFormat     TagFormat     // tagFormat must be provided by the user
+
+	// state
+
+	mu        sync.Mutex         // mu synchronises internal state
+	closed    bool               // closed indicates if w has been closed (triggered by first client close)
+	w         io.WriteCloser     // w is the writer for the connection
+	buf       []byte             // buf is the buffer for the connection
+	rateCache map[float32]string // rateCache caches string representations of sampling rates
 }
 
 func newConn(conf connConfig, muted bool) (*conn, error) {
 	c := &conn{
-		addr:          conf.Addr,
 		errorHandler:  conf.ErrorHandler,
 		flushPeriod:   conf.FlushPeriod,
 		maxPacketSize: conf.MaxPacketSize,
-		network:       conf.Network,
 		tagFormat:     conf.TagFormat,
 	}
 
@@ -41,13 +39,13 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	}
 
 	var err error
-	c.w, err = dialTimeout(c.network, c.addr, 5*time.Second)
+	c.w, err = dialTimeout(conf.Network, conf.Addr, 5*time.Second)
 	if err != nil {
 		return c, err
 	}
 	// When using UDP do a quick check to see if something is listening on the
 	// given port to return an error as soon as possible.
-	if c.network[:3] == "udp" {
+	if conf.Network[:3] == "udp" {
 		for i := 0; i < 2; i++ {
 			_, err = c.w.Write(nil)
 			if err != nil {
