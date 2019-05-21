@@ -2,6 +2,7 @@ package statsd
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"time"
 )
@@ -25,6 +26,7 @@ type connConfig struct {
 	MaxPacketSize int
 	Network       string
 	TagFormat     TagFormat
+	WriteCloser   io.WriteCloser
 }
 
 // An Option represents an option for a Client. It must be used as an
@@ -84,8 +86,24 @@ func Network(network string) Option {
 	})
 }
 
+// WriteCloser sets the connection writer used by the client. If this option is
+// present it will take precedence over the Network and Address options. If the
+// client is muted then the writer will be closed before returning. The writer
+// will be closed on Client.Close. Multiples of this option will cause the last
+// writer to be used (if any), and previously provided writers to be closed.
+//
+// This option is ignored in Client.Clone().
+func WriteCloser(writer io.WriteCloser) Option {
+	return func(c *config) {
+		if c.Conn.WriteCloser != nil {
+			_ = c.Conn.WriteCloser.Close()
+		}
+		c.Conn.WriteCloser = writer
+	}
+}
+
 // Mute sets whether the Client is muted. All methods of a muted Client do
-// nothing and return immedialtly.
+// nothing and return immediately.
 //
 // This option can be used in Client.Clone() only if the parent Client is not
 // muted. The clones of a muted Client are always muted.

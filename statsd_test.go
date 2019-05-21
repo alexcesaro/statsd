@@ -245,6 +245,27 @@ func TestFlushPeriod(t *testing.T) {
 	}, FlushPeriod(time.Nanosecond))
 }
 
+func TestFlushPeriod_writeCloser(t *testing.T) {
+	c, err := New(
+		ErrorHandler(expectNoError(t)),
+		FlushPeriod(time.Nanosecond),
+		WriteCloser(&testBuffer{}),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	c.Increment(testKey)
+	time.Sleep(time.Millisecond * 400)
+	c.conn.mu.Lock()
+	got := getOutput(c)
+	want := "test_key:1|c"
+	if got != want {
+		t.Errorf("Invalid output, got %q, want %q", got, want)
+	}
+	c.conn.mu.Unlock()
+	c.Close()
+}
+
 func TestMaxPacketSize(t *testing.T) {
 	testClient(t, func(c *Client) {
 		c.Increment(testKey)
@@ -370,6 +391,75 @@ func TestUDPNotListening(t *testing.T) {
 	if err == nil {
 		t.Error("New should return an error")
 	}
+}
+
+func TestWriteCloser(t *testing.T) {
+	count := 0
+	writer := &mockWriteCloser{
+		close: func() error {
+			count++
+			return nil
+		},
+	}
+	config := new(config)
+	WriteCloser(writer)(config)
+	if v := config.Conn.WriteCloser; v != writer {
+		t.Fatal(v)
+	}
+	if count != 0 {
+		t.Fatal(writer)
+	}
+	WriteCloser(nil)(config)
+	if v := config.Conn.WriteCloser; v != nil {
+		t.Fatal(v)
+	}
+	if count != 1 {
+		t.Fatal(writer)
+	}
+}
+
+func TestNew_writeCloserClosesOnMute(t *testing.T) {
+	count := 0
+	writer := &mockWriteCloser{
+		close: func() error {
+			count++
+			return nil
+		},
+	}
+	client, err := New(
+		FlushPeriod(0),
+		ErrorHandler(expectNoError(t)),
+		WriteCloser(writer),
+		Mute(true),
+	)
+	if client == nil || err != nil {
+		t.Fatal(client, err)
+	}
+	if client.conn.w != nil {
+		t.Error(client.conn.w)
+	}
+	if count != 1 {
+		t.Error(count)
+	}
+}
+
+type mockWriteCloser struct {
+	write func(p []byte) (n int, err error)
+	close func() error
+}
+
+func (m *mockWriteCloser) Write(p []byte) (n int, err error) {
+	if m.write != nil {
+		return m.write(p)
+	}
+	panic("implement me")
+}
+
+func (m *mockWriteCloser) Close() error {
+	if m.close != nil {
+		return m.close()
+	}
+	panic("implement me")
 }
 
 type mockClosedUDPConn struct {
