@@ -233,7 +233,7 @@ func TestFlush(t *testing.T) {
 func TestFlushPeriod(t *testing.T) {
 	testClient(t, func(c *Client) {
 		c.Increment(testKey)
-		time.Sleep(time.Millisecond)
+		time.Sleep(time.Millisecond * 400)
 		c.conn.mu.Lock()
 		got := getOutput(c)
 		want := "test_key:1|c"
