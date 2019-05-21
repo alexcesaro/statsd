@@ -27,6 +27,7 @@ type connConfig struct {
 	Network       string
 	TagFormat     TagFormat
 	WriteCloser   io.WriteCloser
+	InlineFlush   bool
 }
 
 // An Option represents an option for a Client. It must be used as an
@@ -54,7 +55,7 @@ func ErrorHandler(h func(error)) Option {
 }
 
 // FlushPeriod sets how often the Client's buffer is flushed. If p is 0, the
-// goroutine that periodically flush the buffer is not lauched and the buffer
+// goroutine that periodically flush the buffer is not launched and the buffer
 // is only flushed when it is full.
 //
 // By default, the flush period is 100 ms.  This option is ignored in
@@ -99,6 +100,18 @@ func WriteCloser(writer io.WriteCloser) Option {
 			_ = c.Conn.WriteCloser.Close()
 		}
 		c.Conn.WriteCloser = writer
+	}
+}
+
+// InlineFlush enables or disables (default disabled) forced flushing, inline
+// with recording each stat. This option takes precedence over FlushPeriod,
+// which would be redundant if always flushing after each write. Note that
+// this DOES NOT guarantee exactly one line per write.
+//
+// This option is ignored in Client.Clone().
+func InlineFlush(enabled bool) Option {
+	return func(c *config) {
+		c.Conn.InlineFlush = enabled
 	}
 }
 

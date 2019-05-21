@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -440,6 +441,77 @@ func TestNew_writeCloserClosesOnMute(t *testing.T) {
 	}
 	if count != 1 {
 		t.Error(count)
+	}
+}
+
+func TestNew_inlineFlush(t *testing.T) {
+	defer func() func() {
+		startGoroutines := runtime.NumGoroutine()
+		return func() {
+			endGoroutines := runtime.NumGoroutine()
+			if startGoroutines < endGoroutines {
+				t.Error(startGoroutines, endGoroutines)
+			}
+		}
+	}()()
+	client, err := New(
+		FlushPeriod(0),
+		ErrorHandler(expectNoError(t)),
+		WriteCloser(&mockWriteCloser{}),
+		InlineFlush(true),
+	)
+	if client == nil || err != nil || client.muted {
+		t.Fatal(client, err)
+	}
+	if !client.conn.inlineFlush {
+		t.Error(client.conn.inlineFlush)
+	}
+}
+
+func TestInlineFlush(t *testing.T) {
+	config := new(config)
+	InlineFlush(true)(config)
+	if !config.Conn.InlineFlush {
+		t.Error(config.Conn.InlineFlush)
+	}
+}
+
+func TestConn_flushNecessary_inlineFlush(t *testing.T) {
+	if !(&conn{inlineFlush: true}).flushNecessary() {
+		t.Error(`expected always true if always flush is enabled`)
+	}
+}
+
+func TestConn_flushIfNecessary_inlineFlush(t *testing.T) {
+	var (
+		called  bool
+		flushed string
+		c       = &conn{
+			buf:           []byte("test_key:1|c\n"),
+			inlineFlush:   true,
+			maxPacketSize: 100,
+			w: &mockWriteCloser{
+				write: func(b []byte) (int, error) {
+					if called {
+						t.Error(`called more than once`)
+					}
+					called = true
+					flushed = string(b)
+					return len(b), nil
+				},
+			},
+		}
+	)
+	// will actually flush everything
+	c.flushIfNecessary(2)
+	if !called {
+		t.Error(called)
+	}
+	if flushed != "test_key:1|c" {
+		t.Error(flushed)
+	}
+	if len(c.buf) != 0 {
+		t.Error(c.buf)
 	}
 }
 

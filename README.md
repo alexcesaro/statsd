@@ -9,6 +9,8 @@ No releases but `master` will remain stable™.
 
 * 2019-05-22 - Added support for arbitrary output streams via new `statsd.WriteCloser` option
 
+* 2019-05-22 - Added support for simplified inline flush logic via new `statsd.InlineFlush` option
+
 ---
 
 # statsd

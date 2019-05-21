@@ -12,10 +12,11 @@ import (
 type conn struct {
 	// config
 
-	errorHandler  func(error)   // errorHandler may be provided by the user
-	flushPeriod   time.Duration // flushPeriod may be provided by the user
-	maxPacketSize int           // maxPacketSize may be provided by the user and has a sensible default
-	tagFormat     TagFormat     // tagFormat must be provided by the user
+	errorHandler  func(error)
+	flushPeriod   time.Duration
+	maxPacketSize int
+	tagFormat     TagFormat
+	inlineFlush   bool
 
 	// state
 
@@ -32,6 +33,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 		flushPeriod:   conf.FlushPeriod,
 		maxPacketSize: conf.MaxPacketSize,
 		tagFormat:     conf.TagFormat,
+		inlineFlush:   conf.InlineFlush,
 		w:             conf.WriteCloser,
 	}
 
@@ -57,23 +59,30 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	// an additional metric.
 	c.buf = make([]byte, 0, c.maxPacketSize+200)
 
-	if c.flushPeriod > 0 {
-		go func() {
-			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
-				c.mu.Lock()
-				if c.closed {
-					ticker.Stop()
-					c.mu.Unlock()
-					return
-				}
-				c.flush(0)
-				c.mu.Unlock()
-			}
-		}()
+	// start the flush worker only if we have a rate and it's not unnecessary
+	if c.flushPeriod > 0 && !c.inlineFlush {
+		go c.flushWorker()
 	}
 
 	return c, nil
+}
+
+func (c *conn) flushWorker() {
+	ticker := time.NewTicker(c.flushPeriod)
+	defer ticker.Stop()
+	for range ticker.C {
+		if func() bool {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			if c.closed {
+				return true
+			}
+			c.flush(0)
+			return false
+		}() {
+			return
+		}
+	}
 }
 
 func (c *conn) connect(network string, address string) error {
@@ -105,7 +114,7 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.appendType(typ)
 	c.appendRate(rate)
 	c.closeMetric(tags)
-	c.flushIfBufferFull(l)
+	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
 
@@ -120,7 +129,7 @@ func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	}
 	c.appendBucket(prefix, bucket, tags)
 	c.appendGauge(value, tags)
-	c.flushIfBufferFull(l)
+	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
 
@@ -137,7 +146,7 @@ func (c *conn) unique(prefix, bucket string, value string, tags string) {
 	c.appendString(value)
 	c.appendType("s")
 	c.closeMetric(tags)
-	c.flushIfBufferFull(l)
+	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
 
@@ -247,8 +256,21 @@ func (c *conn) closeMetric(tags string) {
 	c.appendByte('\n')
 }
 
-func (c *conn) flushIfBufferFull(lastSafeLen int) {
+func (c *conn) flushNecessary() bool {
+	if c.inlineFlush {
+		return true
+	}
 	if len(c.buf) > c.maxPacketSize {
+		return true
+	}
+	return false
+}
+
+func (c *conn) flushIfNecessary(lastSafeLen int) {
+	if c.inlineFlush {
+		lastSafeLen = 0
+	}
+	if c.flushNecessary() {
 		c.flush(lastSafeLen)
 	}
 }
