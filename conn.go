@@ -20,11 +20,12 @@ type conn struct {
 
 	// state
 
-	mu        sync.Mutex         // mu synchronises internal state
-	closed    bool               // closed indicates if w has been closed (triggered by first client close)
-	w         io.WriteCloser     // w is the writer for the connection
-	buf       []byte             // buf is the buffer for the connection
-	rateCache map[float32]string // rateCache caches string representations of sampling rates
+	mu                  sync.Mutex         // mu synchronises internal state
+	closed              bool               // closed indicates if w has been closed (triggered by first client close)
+	w                   io.WriteCloser     // w is the writer for the connection
+	buf                 []byte             // buf is the buffer for the connection
+	rateCache           map[float32]string // rateCache caches string representations of sampling rates
+	trimTrailingNewline bool               // trimTrailingNewline is set only when running in UDP mode
 }
 
 func newConn(conf connConfig, muted bool) (*conn, error) {
@@ -91,9 +92,13 @@ func (c *conn) connect(network string, address string) error {
 	if err != nil {
 		return err
 	}
-	// When using UDP do a quick check to see if something is listening on the
-	// given port to return an error as soon as possible.
+
 	if network[:3] == "udp" {
+		// udp retains behavior from the original implementation where it would strip a trailing newline
+		c.trimTrailingNewline = true
+
+		// When using UDP do a quick check to see if something is listening on the
+		// given port to return an error as soon as possible.
 		for i := 0; i < 2; i++ {
 			_, err = c.w.Write(nil)
 			if err != nil {
@@ -285,9 +290,17 @@ func (c *conn) flush(n int) {
 		n = len(c.buf)
 	}
 
-	// Trim the last \n, StatsD does not like it.
-	_, err := c.w.Write(c.buf[:n-1])
+	// write
+	buffer := c.buf[:n]
+	if c.trimTrailingNewline {
+		// https://github.com/cactus/go-statsd-client/issues/17
+		// Trim the last \n, StatsD does not like it.
+		buffer = buffer[:len(buffer)-1]
+	}
+	_, err := c.w.Write(buffer)
 	c.handleError(err)
+
+	// consume
 	if n < len(c.buf) {
 		copy(c.buf, c.buf[n:])
 	}

@@ -11,6 +11,8 @@ No releases but `master` will remain stable™.
 
 * 2019-05-22 - Added support for simplified inline flush logic via new `statsd.InlineFlush` option
 
+* 2019-05-26 - Fixed bug causing trailing newlines to be removed for streaming (non-udp) connections
+
 ---
 
 # statsd

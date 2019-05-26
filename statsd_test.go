@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -259,7 +260,7 @@ func TestFlushPeriod_writeCloser(t *testing.T) {
 	time.Sleep(time.Millisecond * 400)
 	c.conn.mu.Lock()
 	got := getOutput(c)
-	want := "test_key:1|c"
+	want := "test_key:1|c\n"
 	if got != want {
 		t.Errorf("Invalid output, got %q, want %q", got, want)
 	}
@@ -507,7 +508,7 @@ func TestConn_flushIfNecessary_inlineFlush(t *testing.T) {
 	if !called {
 		t.Error(called)
 	}
-	if flushed != "test_key:1|c" {
+	if flushed != "test_key:1|c\n" {
 		t.Error(flushed)
 	}
 	if len(c.buf) != 0 {
@@ -636,6 +637,13 @@ func testNetwork(t *testing.T, network string) {
 	received := make(chan bool)
 	server := newServer(t, network, testAddr, func(p []byte) {
 		s := string(p)
+		if network != "udp" {
+			if !strings.HasSuffix(s, "\n") {
+				t.Error(s)
+			} else {
+				s = s[:len(s)-1]
+			}
+		}
 		if s != "test_key:1|c" {
 			t.Errorf("invalid output: %q", s)
 		}
