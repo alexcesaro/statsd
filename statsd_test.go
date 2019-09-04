@@ -359,16 +359,15 @@ func TestConcurrency(t *testing.T) {
 	})
 }
 
+// We expect to be able to create a client, even if the server is not listening
 func TestUDPNotListening(t *testing.T) {
 	dialTimeout = mockUDPClosed
 	defer func() { dialTimeout = net.DialTimeout }()
 
-	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
-	}
-	if err == nil {
-		t.Error("New should return an error")
+	_, err := New()
+
+	if err != nil {
+		t.Fatalf("New: %v", err)
 	}
 }
 

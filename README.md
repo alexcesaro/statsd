@@ -9,6 +9,10 @@ client.
 See the [benchmark](https://github.com/alexcesaro/statsdbench) for a comparison
 with other Go StatsD clients.
 
+## Changes from the original version
+The sole change from the original project from alexcesaro, is that we do not test if the server
+is listening, when creating a UDP client.
+
 ## Features
 
 - Supports all StatsD metrics: counter, gauge, timing and set
