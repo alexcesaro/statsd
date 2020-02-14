@@ -1,20 +1,3 @@
-I intend to maintain this fork of [alexcesaro/statsd](https://github.com/alexcesaro/statsd) for the foreseeable future,
-as I use this library in my own projects. Backwards compatibility is my highest priority. I did attempt to look for
-existing maintained forks, but the few I investigated all made breaking changes. I will be adding new features, but
-only when I have an immediate use case, and I will do my best to keep to the spirit of the original implementation.
-
-No releases but `master` will remain stable™.
-
-**Changelog**
-
-* 2019-05-22 - Added support for arbitrary output streams via new `statsd.WriteCloser` option
-
-* 2019-05-22 - Added support for simplified inline flush logic via new `statsd.InlineFlush` option
-
-* 2019-05-26 - Fixed bug causing trailing newlines to be removed for streaming (non-udp) connections
-
----
-
 # statsd
 [![Build Status](https://travis-ci.org/alexcesaro/statsd.svg?branch=v2)](https://travis-ci.org/alexcesaro/statsd) [![Code Coverage](http://gocover.io/_badge/gopkg.in/alexcesaro/statsd.v2)](http://gocover.io/gopkg.in/alexcesaro/statsd.v2) [![Documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2?status.svg)](https://godoc.org/gopkg.in/alexcesaro/statsd.v2)
 
