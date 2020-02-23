@@ -54,7 +54,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	if c.flushPeriod > 0 {
 		go func() {
 			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.mu.Lock()
 				if c.closed {
 					ticker.Stop()
@@ -92,6 +92,7 @@ func (c *conn) gaugeRelative(prefix, bucket string, value interface{}, tags stri
 		c.appendString(fmt.Sprintf("+%v", value))
 	}
 	c.appendType("g")
+	c.closeMetric(tags)
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
@@ -170,23 +171,23 @@ func isNegative(v interface{}) bool {
 	case int:
 		return n < 0
 	case uint:
-		return n < 0
+		return false
 	case int64:
 		return n < 0
 	case uint64:
-		return n < 0
+		return false
 	case int32:
 		return n < 0
 	case uint32:
-		return n < 0
+		return false
 	case int16:
 		return n < 0
 	case uint16:
-		return n < 0
+		return false
 	case int8:
 		return n < 0
 	case uint8:
-		return n < 0
+		return false
 	case float64:
 		return n < 0
 	case float32:

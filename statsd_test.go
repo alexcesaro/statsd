@@ -37,6 +37,13 @@ func TestGauge(t *testing.T) {
 	})
 }
 
+func TestGaugeRelative(t *testing.T) {
+	testOutput(t, "test_key:+5|g\ntest_key:-10|g", func(c *Client) {
+		c.GaugeRelative(testKey, 5)
+		c.GaugeRelative(testKey, -10)
+	})
+}
+
 func TestTiming(t *testing.T) {
 	testOutput(t, "test_key:6|ms", func(c *Client) {
 		c.Timing(testKey, 6)
@@ -357,40 +364,6 @@ func TestConcurrency(t *testing.T) {
 		c.Increment(testKey)
 		wg.Wait()
 	})
-}
-
-func TestUDPNotListening(t *testing.T) {
-	dialTimeout = mockUDPClosed
-	defer func() { dialTimeout = net.DialTimeout }()
-
-	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
-	}
-	if err == nil {
-		t.Error("New should return an error")
-	}
-}
-
-type mockClosedUDPConn struct {
-	i int
-	net.Conn
-}
-
-func (c *mockClosedUDPConn) Write(p []byte) (int, error) {
-	c.i++
-	if c.i == 2 {
-		return 0, errors.New("test error")
-	}
-	return 0, nil
-}
-
-func (c *mockClosedUDPConn) Close() error {
-	return nil
-}
-
-func mockUDPClosed(string, string, time.Duration) (net.Conn, error) {
-	return &mockClosedUDPConn{}, nil
 }
 
 func testClient(t *testing.T, f func(*Client), options ...Option) {
