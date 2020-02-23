@@ -1,6 +1,7 @@
 package statsd
 
 import (
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -45,18 +46,6 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	if err != nil {
 		return c, err
 	}
-	// When using UDP do a quick check to see if something is listening on the
-	// given port to return an error as soon as possible.
-	if c.network[:3] == "udp" {
-		for i := 0; i < 2; i++ {
-			_, err = c.w.Write(nil)
-			if err != nil {
-				_ = c.w.Close()
-				c.w = nil
-				return c, err
-			}
-		}
-	}
 
 	// To prevent a buffer overflow add some capacity to the buffer to allow for
 	// an additional metric.
@@ -65,7 +54,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	if c.flushPeriod > 0 {
 		go func() {
 			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.mu.Lock()
 				if c.closed {
 					ticker.Stop()
@@ -88,6 +77,21 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.appendNumber(n)
 	c.appendType(typ)
 	c.appendRate(rate)
+	c.closeMetric(tags)
+	c.flushIfBufferFull(l)
+	c.mu.Unlock()
+}
+
+func (c *conn) gaugeRelative(prefix, bucket string, value interface{}, tags string) {
+	c.mu.Lock()
+	l := len(c.buf)
+	c.appendBucket(prefix, bucket, tags)
+	if isNegative(value) {
+		c.appendNumber(value)
+	} else {
+		c.appendString(fmt.Sprintf("+%v", value))
+	}
+	c.appendType("g")
 	c.closeMetric(tags)
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
@@ -167,23 +171,23 @@ func isNegative(v interface{}) bool {
 	case int:
 		return n < 0
 	case uint:
-		return n < 0
+		return false
 	case int64:
 		return n < 0
 	case uint64:
-		return n < 0
+		return false
 	case int32:
 		return n < 0
 	case uint32:
-		return n < 0
+		return false
 	case int16:
 		return n < 0
 	case uint16:
-		return n < 0
+		return false
 	case int8:
 		return n < 0
 	case uint8:
-		return n < 0
+		return false
 	case float64:
 		return n < 0
 	case float32:
