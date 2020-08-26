@@ -166,33 +166,19 @@ func Tags(tags ...string) Option {
 	if len(tags)%2 != 0 {
 		panic("statsd: Tags only accepts an even number of arguments")
 	}
-
-	return Option(func(c *config) {
-		if len(tags) == 0 {
-			return
-		}
-
-		newTags := make([]tag, len(tags)/2)
+	return func(c *config) {
+	UpdateLoop:
 		for i := 0; i < len(tags)/2; i++ {
-			newTags[i] = tag{K: tags[2*i], V: tags[2*i+1]}
-		}
-
-		for _, newTag := range newTags {
-			exists := false
-			for _, oldTag := range c.Client.Tags {
+			newTag := tag{K: tags[2*i], V: tags[2*i+1]}
+			for i, oldTag := range c.Client.Tags {
 				if newTag.K == oldTag.K {
-					exists = true
-					oldTag.V = newTag.V
+					c.Client.Tags[i] = newTag
+					continue UpdateLoop
 				}
 			}
-			if !exists {
-				c.Client.Tags = append(c.Client.Tags, tag{
-					K: newTag.K,
-					V: newTag.V,
-				})
-			}
+			c.Client.Tags = append(c.Client.Tags, newTag)
 		}
-	})
+	}
 }
 
 type tag struct {

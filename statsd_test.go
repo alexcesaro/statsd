@@ -340,17 +340,17 @@ func TestCloneRate(t *testing.T) {
 }
 
 func TestCloneInfluxDBTags(t *testing.T) {
-	testOutput(t, "test_key,tag1=value1,tag2=value2:5|c", func(c *Client) {
-		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
+	testOutput(t, "test_key,tag1=value3,tag3=value4,tag4=value9,tag5=value6,tag2=value2:5|c", func(c *Client) {
+		clone := c.Clone(Tags("tag2", "value2", "tag1", "value3", "tag4", "value8", "tag4", "value9"))
 		clone.Count(testKey, 5)
-	}, TagsFormat(InfluxDB), Tags("tag1", "value1"))
+	}, TagsFormat(InfluxDB), Tags("tag1", "value1", "tag3", "value4", "tag4", "value5", "tag5", "value6", "tag4", "value7"))
 }
 
 func TestCloneDatadogTags(t *testing.T) {
-	testOutput(t, "test_key:5|c|#tag1:value1,tag2:value2", func(c *Client) {
+	testOutput(t, "test_key:5|c|#tag1:value3,tag3:value4,tag2:value2", func(c *Client) {
 		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
 		clone.Count(testKey, 5)
-	}, TagsFormat(Datadog), Tags("tag1", "value1"))
+	}, TagsFormat(Datadog), Tags("tag1", "value1", "tag3", "value4"))
 }
 
 func TestDialError(t *testing.T) {
@@ -557,6 +557,7 @@ func mockUDPClosed(string, string, time.Duration) (net.Conn, error) {
 }
 
 func testClient(t *testing.T, f func(*Client), options ...Option) {
+	t.Helper()
 	dialTimeout = mockDial
 	defer func() { dialTimeout = net.DialTimeout }()
 
@@ -573,7 +574,9 @@ func testClient(t *testing.T, f func(*Client), options ...Option) {
 }
 
 func testOutput(t *testing.T, want string, f func(*Client), options ...Option) {
+	t.Helper()
 	testClient(t, func(c *Client) {
+		t.Helper()
 		f(c)
 		c.Close()
 
