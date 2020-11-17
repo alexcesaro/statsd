@@ -1,9 +1,6 @@
-I intend to maintain this fork of [alexcesaro/statsd](https://github.com/alexcesaro/statsd) for the foreseeable future,
-as I use this library in my own projects. Backwards compatibility is my highest priority. I did attempt to look for
-existing maintained forks, but the few I investigated all made breaking changes. I will be adding new features, but
-only when I have an immediate use case, and I will do my best to keep to the spirit of the original implementation.
+This is a backwards compatible fork of [alexcesaro/statsd](https://github.com/alexcesaro/statsd).
 
-No releases but `master` will remain stable™.
+Note that this repository is versioned independently of the (unmaintained) upstream.
 
 **Changelog**
 
