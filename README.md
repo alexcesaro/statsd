@@ -7,6 +7,8 @@ No releases but `master` will remain stable™.
 
 **Changelog**
 
+* 2020-11-13 - Added the SafeConn write closer that checks if the connection is still up before attempting to write
+
 * 2020-08-27 - Fixed bug in `statsd.Tags` identified by https://github.com/alexcesaro/statsd/issues/41
 
 * 2019-05-22 - Added support for arbitrary output streams via new `statsd.WriteCloser` option
