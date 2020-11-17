@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -233,7 +235,7 @@ func TestFlush(t *testing.T) {
 func TestFlushPeriod(t *testing.T) {
 	testClient(t, func(c *Client) {
 		c.Increment(testKey)
-		time.Sleep(time.Millisecond)
+		time.Sleep(time.Millisecond * 400)
 		c.conn.mu.Lock()
 		got := getOutput(c)
 		want := "test_key:1|c"
@@ -243,6 +245,27 @@ func TestFlushPeriod(t *testing.T) {
 		c.conn.mu.Unlock()
 		c.Close()
 	}, FlushPeriod(time.Nanosecond))
+}
+
+func TestFlushPeriod_writeCloser(t *testing.T) {
+	c, err := New(
+		ErrorHandler(expectNoError(t)),
+		FlushPeriod(time.Nanosecond),
+		WriteCloser(&testBuffer{}),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	c.Increment(testKey)
+	time.Sleep(time.Millisecond * 400)
+	c.conn.mu.Lock()
+	got := getOutput(c)
+	want := "test_key:1|c\n"
+	if got != want {
+		t.Errorf("Invalid output, got %q, want %q", got, want)
+	}
+	c.conn.mu.Unlock()
+	c.Close()
 }
 
 func TestMaxPacketSize(t *testing.T) {
@@ -317,17 +340,17 @@ func TestCloneRate(t *testing.T) {
 }
 
 func TestCloneInfluxDBTags(t *testing.T) {
-	testOutput(t, "test_key,tag1=value1,tag2=value2:5|c", func(c *Client) {
-		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
+	testOutput(t, "test_key,tag1=value3,tag3=value4,tag4=value9,tag5=value6,tag2=value2:5|c", func(c *Client) {
+		clone := c.Clone(Tags("tag2", "value2", "tag1", "value3", "tag4", "value8", "tag4", "value9"))
 		clone.Count(testKey, 5)
-	}, TagsFormat(InfluxDB), Tags("tag1", "value1"))
+	}, TagsFormat(InfluxDB), Tags("tag1", "value1", "tag3", "value4", "tag4", "value5", "tag5", "value6", "tag4", "value7"))
 }
 
 func TestCloneDatadogTags(t *testing.T) {
-	testOutput(t, "test_key:5|c|#tag1:value1,tag2:value2", func(c *Client) {
+	testOutput(t, "test_key:5|c|#tag1:value3,tag3:value4,tag2:value2", func(c *Client) {
 		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
 		clone.Count(testKey, 5)
-	}, TagsFormat(Datadog), Tags("tag1", "value1"))
+	}, TagsFormat(Datadog), Tags("tag1", "value1", "tag3", "value4"))
 }
 
 func TestDialError(t *testing.T) {
@@ -372,6 +395,146 @@ func TestUDPNotListening(t *testing.T) {
 	}
 }
 
+func TestWriteCloser(t *testing.T) {
+	count := 0
+	writer := &mockWriteCloser{
+		close: func() error {
+			count++
+			return nil
+		},
+	}
+	config := new(config)
+	WriteCloser(writer)(config)
+	if v := config.Conn.WriteCloser; v != writer {
+		t.Fatal(v)
+	}
+	if count != 0 {
+		t.Fatal(writer)
+	}
+	WriteCloser(nil)(config)
+	if v := config.Conn.WriteCloser; v != nil {
+		t.Fatal(v)
+	}
+	if count != 1 {
+		t.Fatal(writer)
+	}
+}
+
+func TestNew_writeCloserClosesOnMute(t *testing.T) {
+	count := 0
+	writer := &mockWriteCloser{
+		close: func() error {
+			count++
+			return nil
+		},
+	}
+	client, err := New(
+		FlushPeriod(0),
+		ErrorHandler(expectNoError(t)),
+		WriteCloser(writer),
+		Mute(true),
+	)
+	if client == nil || err != nil {
+		t.Fatal(client, err)
+	}
+	if client.conn.w != nil {
+		t.Error(client.conn.w)
+	}
+	if count != 1 {
+		t.Error(count)
+	}
+}
+
+func TestNew_inlineFlush(t *testing.T) {
+	defer func() func() {
+		startGoroutines := runtime.NumGoroutine()
+		return func() {
+			endGoroutines := runtime.NumGoroutine()
+			if startGoroutines < endGoroutines {
+				t.Error(startGoroutines, endGoroutines)
+			}
+		}
+	}()()
+	client, err := New(
+		FlushPeriod(0),
+		ErrorHandler(expectNoError(t)),
+		WriteCloser(&mockWriteCloser{}),
+		InlineFlush(true),
+	)
+	if client == nil || err != nil || client.muted {
+		t.Fatal(client, err)
+	}
+	if !client.conn.inlineFlush {
+		t.Error(client.conn.inlineFlush)
+	}
+}
+
+func TestInlineFlush(t *testing.T) {
+	config := new(config)
+	InlineFlush(true)(config)
+	if !config.Conn.InlineFlush {
+		t.Error(config.Conn.InlineFlush)
+	}
+}
+
+func TestConn_flushNecessary_inlineFlush(t *testing.T) {
+	if !(&conn{inlineFlush: true}).flushNecessary() {
+		t.Error(`expected always true if always flush is enabled`)
+	}
+}
+
+func TestConn_flushIfNecessary_inlineFlush(t *testing.T) {
+	var (
+		called  bool
+		flushed string
+		c       = &conn{
+			buf:           []byte("test_key:1|c\n"),
+			inlineFlush:   true,
+			maxPacketSize: 100,
+			w: &mockWriteCloser{
+				write: func(b []byte) (int, error) {
+					if called {
+						t.Error(`called more than once`)
+					}
+					called = true
+					flushed = string(b)
+					return len(b), nil
+				},
+			},
+		}
+	)
+	// will actually flush everything
+	c.flushIfNecessary(2)
+	if !called {
+		t.Error(called)
+	}
+	if flushed != "test_key:1|c\n" {
+		t.Error(flushed)
+	}
+	if len(c.buf) != 0 {
+		t.Error(c.buf)
+	}
+}
+
+type mockWriteCloser struct {
+	write func(p []byte) (n int, err error)
+	close func() error
+}
+
+func (m *mockWriteCloser) Write(p []byte) (n int, err error) {
+	if m.write != nil {
+		return m.write(p)
+	}
+	panic("implement me")
+}
+
+func (m *mockWriteCloser) Close() error {
+	if m.close != nil {
+		return m.close()
+	}
+	panic("implement me")
+}
+
 type mockClosedUDPConn struct {
 	i int
 	net.Conn
@@ -394,6 +557,7 @@ func mockUDPClosed(string, string, time.Duration) (net.Conn, error) {
 }
 
 func testClient(t *testing.T, f func(*Client), options ...Option) {
+	t.Helper()
 	dialTimeout = mockDial
 	defer func() { dialTimeout = net.DialTimeout }()
 
@@ -410,7 +574,9 @@ func testClient(t *testing.T, f func(*Client), options ...Option) {
 }
 
 func testOutput(t *testing.T, want string, f func(*Client), options ...Option) {
+	t.Helper()
 	testClient(t, func(c *Client) {
+		t.Helper()
 		f(c)
 		c.Close()
 
@@ -474,6 +640,13 @@ func testNetwork(t *testing.T, network string) {
 	received := make(chan bool)
 	server := newServer(t, network, testAddr, func(p []byte) {
 		s := string(p)
+		if network != "udp" {
+			if !strings.HasSuffix(s, "\n") {
+				t.Error(s)
+			} else {
+				s = s[:len(s)-1]
+			}
+		}
 		if s != "test_key:1|c" {
 			t.Errorf("invalid output: %q", s)
 		}

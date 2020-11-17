@@ -10,51 +10,49 @@ import (
 )
 
 type conn struct {
-	// Fields settable with options at Client's creation.
-	addr          string
+	// config
+
 	errorHandler  func(error)
 	flushPeriod   time.Duration
 	maxPacketSize int
-	network       string
 	tagFormat     TagFormat
+	inlineFlush   bool
 
-	mu sync.Mutex
-	// Fields guarded by the mutex.
-	closed    bool
-	w         io.WriteCloser
-	buf       []byte
-	rateCache map[float32]string
+	// state
+
+	mu                  sync.Mutex         // mu synchronises internal state
+	closed              bool               // closed indicates if w has been closed (triggered by first client close)
+	w                   io.WriteCloser     // w is the writer for the connection
+	buf                 []byte             // buf is the buffer for the connection
+	rateCache           map[float32]string // rateCache caches string representations of sampling rates
+	trimTrailingNewline bool               // trimTrailingNewline is set only when running in UDP mode
 }
 
 func newConn(conf connConfig, muted bool) (*conn, error) {
 	c := &conn{
-		addr:          conf.Addr,
 		errorHandler:  conf.ErrorHandler,
 		flushPeriod:   conf.FlushPeriod,
 		maxPacketSize: conf.MaxPacketSize,
-		network:       conf.Network,
 		tagFormat:     conf.TagFormat,
+		inlineFlush:   conf.InlineFlush,
+		w:             conf.WriteCloser,
 	}
 
+	// exit if muted
 	if muted {
+		// close and clear any provided writer
+		if c.w != nil {
+			_ = c.w.Close()
+			c.w = nil
+		}
+		// return muted client
 		return c, nil
 	}
 
-	var err error
-	c.w, err = dialTimeout(c.network, c.addr, 5*time.Second)
-	if err != nil {
-		return c, err
-	}
-	// When using UDP do a quick check to see if something is listening on the
-	// given port to return an error as soon as possible.
-	if c.network[:3] == "udp" {
-		for i := 0; i < 2; i++ {
-			_, err = c.w.Write(nil)
-			if err != nil {
-				_ = c.w.Close()
-				c.w = nil
-				return c, err
-			}
+	// initialise writer if not provided
+	if c.w == nil {
+		if err := c.connect(conf.Network, conf.Addr); err != nil {
+			return c, err
 		}
 	}
 
@@ -62,23 +60,55 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 	// an additional metric.
 	c.buf = make([]byte, 0, c.maxPacketSize+200)
 
-	if c.flushPeriod > 0 {
-		go func() {
-			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
-				c.mu.Lock()
-				if c.closed {
-					ticker.Stop()
-					c.mu.Unlock()
-					return
-				}
-				c.flush(0)
-				c.mu.Unlock()
-			}
-		}()
+	// start the flush worker only if we have a rate and it's not unnecessary
+	if c.flushPeriod > 0 && !c.inlineFlush {
+		go c.flushWorker()
 	}
 
 	return c, nil
+}
+
+func (c *conn) flushWorker() {
+	ticker := time.NewTicker(c.flushPeriod)
+	defer ticker.Stop()
+	for range ticker.C {
+		if func() bool {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			if c.closed {
+				return true
+			}
+			c.flush(0)
+			return false
+		}() {
+			return
+		}
+	}
+}
+
+func (c *conn) connect(network string, address string) error {
+	var err error
+	c.w, err = dialTimeout(network, address, 5*time.Second)
+	if err != nil {
+		return err
+	}
+
+	if network[:3] == "udp" {
+		// udp retains behavior from the original implementation where it would strip a trailing newline
+		c.trimTrailingNewline = true
+
+		// When using UDP do a quick check to see if something is listening on the
+		// given port to return an error as soon as possible.
+		for i := 0; i < 2; i++ {
+			_, err = c.w.Write(nil)
+			if err != nil {
+				_ = c.w.Close()
+				c.w = nil
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate float32, tags string) {
@@ -89,7 +119,7 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.appendType(typ)
 	c.appendRate(rate)
 	c.closeMetric(tags)
-	c.flushIfBufferFull(l)
+	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
 
@@ -104,7 +134,7 @@ func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	}
 	c.appendBucket(prefix, bucket, tags)
 	c.appendGauge(value, tags)
-	c.flushIfBufferFull(l)
+	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
 
@@ -121,7 +151,7 @@ func (c *conn) unique(prefix, bucket string, value string, tags string) {
 	c.appendString(value)
 	c.appendType("s")
 	c.closeMetric(tags)
-	c.flushIfBufferFull(l)
+	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
 
@@ -231,8 +261,21 @@ func (c *conn) closeMetric(tags string) {
 	c.appendByte('\n')
 }
 
-func (c *conn) flushIfBufferFull(lastSafeLen int) {
+func (c *conn) flushNecessary() bool {
+	if c.inlineFlush {
+		return true
+	}
 	if len(c.buf) > c.maxPacketSize {
+		return true
+	}
+	return false
+}
+
+func (c *conn) flushIfNecessary(lastSafeLen int) {
+	if c.inlineFlush {
+		lastSafeLen = 0
+	}
+	if c.flushNecessary() {
 		c.flush(lastSafeLen)
 	}
 }
@@ -247,9 +290,17 @@ func (c *conn) flush(n int) {
 		n = len(c.buf)
 	}
 
-	// Trim the last \n, StatsD does not like it.
-	_, err := c.w.Write(c.buf[:n-1])
+	// write
+	buffer := c.buf[:n]
+	if c.trimTrailingNewline {
+		// https://github.com/cactus/go-statsd-client/issues/17
+		// Trim the last \n, StatsD does not like it.
+		buffer = buffer[:len(buffer)-1]
+	}
+	_, err := c.w.Write(buffer)
 	c.handleError(err)
+
+	// consume
 	if n < len(c.buf) {
 		copy(c.buf, c.buf[n:])
 	}
