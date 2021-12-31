@@ -27,6 +27,7 @@ func New(opts ...Option) (*Client, error) {
 			// Ethernet MTU - IPv6 Header - TCP Header = 1500 - 40 - 20 = 1440
 			MaxPacketSize: 1440,
 			Network:       "udp",
+			UDPCheck:      true,
 		},
 	}
 	for _, o := range opts {

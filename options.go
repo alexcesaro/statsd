@@ -19,6 +19,7 @@ type clientConfig struct {
 	Tags   []tag
 }
 
+// connConfig is used by New, to initialise a conn
 type connConfig struct {
 	Addr          string
 	ErrorHandler  func(error)
@@ -28,6 +29,7 @@ type connConfig struct {
 	TagFormat     TagFormat
 	WriteCloser   io.WriteCloser
 	InlineFlush   bool
+	UDPCheck      bool
 }
 
 // An Option represents an option for a Client. It must be used as an
@@ -112,6 +114,19 @@ func WriteCloser(writer io.WriteCloser) Option {
 func InlineFlush(enabled bool) Option {
 	return func(c *config) {
 		c.Conn.InlineFlush = enabled
+	}
+}
+
+// UDPCheck enables or disables (default enabled) checking UDP connections, as
+// part of New. This behavior is useful, as it makes it easier to quickly
+// identify misconfigured services. Disabling this option removes the need to
+// explicitly manage the connection state, at the cost of error visibility.
+// Using an error handler may mitigate some of this cost.
+//
+// This option is ignored in Client.Clone().
+func UDPCheck(enabled bool) Option {
+	return func(c *config) {
+		c.Conn.UDPCheck = enabled
 	}
 }
 

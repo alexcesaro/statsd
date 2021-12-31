@@ -382,16 +382,45 @@ func TestConcurrency(t *testing.T) {
 	})
 }
 
-func TestUDPNotListening(t *testing.T) {
-	dialTimeout = mockUDPClosed
-	defer func() { dialTimeout = net.DialTimeout }()
-
-	c, err := New()
-	if c == nil || !c.muted {
-		t.Error("New() did not return a muted client")
-	}
-	if err == nil {
-		t.Error("New should return an error")
+func TestNew_udpNotListening(t *testing.T) {
+	for _, tc := range [...]struct {
+		Name    string
+		Options []Option
+		Muted   bool
+		Errored bool
+	}{
+		{
+			Name:    `default`,
+			Muted:   true,
+			Errored: true,
+		},
+		{
+			Name:    `true`,
+			Options: []Option{UDPCheck(true)},
+			Muted:   true,
+			Errored: true,
+		},
+		{
+			Name:    `false`,
+			Options: []Option{UDPCheck(false)},
+			Muted:   false,
+			Errored: false,
+		},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			dialTimeout = mockUDPClosed
+			defer func() { dialTimeout = net.DialTimeout }()
+			c, err := New(tc.Options...)
+			if c == nil {
+				t.Fatal(`client should never be nil`)
+			}
+			if c.muted != tc.Muted {
+				t.Error(c.muted)
+			}
+			if (err != nil) != tc.Errored {
+				t.Error(err)
+			}
+		})
 	}
 }
 

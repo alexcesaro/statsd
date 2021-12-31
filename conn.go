@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -51,7 +52,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 
 	// initialise writer if not provided
 	if c.w == nil {
-		if err := c.connect(conf.Network, conf.Addr); err != nil {
+		if err := c.connect(conf.Network, conf.Addr, conf.UDPCheck); err != nil {
 			return c, err
 		}
 	}
@@ -86,28 +87,33 @@ func (c *conn) flushWorker() {
 	}
 }
 
-func (c *conn) connect(network string, address string) error {
+func (c *conn) connect(network string, address string, UDPCheck bool) error {
 	var err error
 	c.w, err = dialTimeout(network, address, 5*time.Second)
 	if err != nil {
 		return err
 	}
 
-	if network[:3] == "udp" {
+	if strings.HasPrefix(network, "udp") {
 		// udp retains behavior from the original implementation where it would strip a trailing newline
 		c.trimTrailingNewline = true
 
 		// When using UDP do a quick check to see if something is listening on the
 		// given port to return an error as soon as possible.
-		for i := 0; i < 2; i++ {
-			_, err = c.w.Write(nil)
-			if err != nil {
-				_ = c.w.Close()
-				c.w = nil
-				return err
+		//
+		// See also doc for UDPCheck option (factory func) and https://github.com/alexcesaro/statsd/issues/6
+		if UDPCheck {
+			for i := 0; i < 2; i++ {
+				_, err = c.w.Write(nil)
+				if err != nil {
+					_ = c.w.Close()
+					c.w = nil
+					return err
+				}
 			}
 		}
 	}
+
 	return nil
 }
 
