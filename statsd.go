@@ -90,7 +90,7 @@ func (c *Client) skip() bool {
 	return c.muted || (c.rate != 1 && randFloat() > c.rate)
 }
 
-// Increment increment the given bucket. It is equivalent to Count(bucket, 1).
+// Increment increments the given bucket. It is equivalent to Count(bucket, 1).
 func (c *Client) Increment(bucket string) {
 	c.Count(bucket, 1)
 }
@@ -111,7 +111,7 @@ func (c *Client) Timing(bucket string, value interface{}) {
 	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tags)
 }
 
-// Histogram sends an histogram value to a bucket.
+// Histogram sends a histogram value to a bucket.
 func (c *Client) Histogram(bucket string, value interface{}) {
 	if c.skip() {
 		return
@@ -119,7 +119,7 @@ func (c *Client) Histogram(bucket string, value interface{}) {
 	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tags)
 }
 
-// A Timing is an helper object that eases sending timing values.
+// Timing is a helper object that eases sending timing values.
 type Timing struct {
 	start time.Time
 	c     *Client
