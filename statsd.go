@@ -11,7 +11,9 @@ type Client struct {
 	tags   string
 }
 
-// New returns a new Client.
+// New returns a new Client, which will always be non-nil, but will be muted
+// (permanently inert / stubbed) if returned with an error, or if the Mute
+// option was set.
 func New(opts ...Option) (*Client, error) {
 	// The default configuration.
 	conf := &config{
