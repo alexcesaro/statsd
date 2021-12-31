@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"math"
 	"net"
 	"runtime"
 	"strings"
@@ -33,17 +34,182 @@ func TestIncrement(t *testing.T) {
 }
 
 func TestGauge(t *testing.T) {
-	testOutput(t, "test_key:5|g\ntest_key:0|g\ntest_key:-10|g", func(c *Client) {
+	testOutput(t, "test_key:5|g\ntest_key:0|g\ntest_key:-10|g\ntest_key:5|g\ntest_key:0|g\ntest_key:-10|g\ntest_key:0|g\ntest_key:0|g", func(c *Client) {
 		c.Gauge(testKey, 5)
 		c.Gauge(testKey, -10)
+		c.Gauge(testKey, 5.0)
+		c.Gauge(testKey, -10.0)
+		c.Gauge(testKey, 0.0)
+		c.Gauge(testKey, math.Copysign(0, -1))
 	})
 }
 
-func TestGaugeRelative(t *testing.T) {
-	testOutput(t, "test_key:+5|g\ntest_key:-10|g", func(c *Client) {
-		c.GaugeRelative(testKey, 5)
-		c.GaugeRelative(testKey, -10)
-	})
+func TestClient_GaugeRelative(t *testing.T) {
+	for _, tc := range [...]struct {
+		Name   string
+		Output string
+		Input  func(c *Client)
+	}{
+		{
+			Name:   "inc then dec",
+			Output: "test_key:+5|g\ntest_key:-10|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, 5)
+				c.GaugeRelative(testKey, -10)
+			},
+		},
+		{
+			Name:   "neg",
+			Output: "test_key:-3.123|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, -3.123)
+			},
+		},
+		{
+			Name:   "pos",
+			Output: "test_key:+3.123|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, 3.123)
+			},
+		},
+		{
+			Name:   "zero",
+			Output: "test_key:+0|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, 0)
+			},
+		},
+		{
+			Name:   "zero float64",
+			Output: "test_key:+0|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float64(0))
+			},
+		},
+		{
+			Name:   "zero float32",
+			Output: "test_key:+0|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(0))
+			},
+		},
+		{
+			Name:   "neg zero float64",
+			Output: "test_key:-0|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, math.Copysign(0, -1))
+			},
+		},
+		{
+			Name:   "neg zero float32",
+			Output: "test_key:-0|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(math.Copysign(0, -1)))
+			},
+		},
+		{
+			Name:   "pos large",
+			Output: "test_key:+5932443000000000000000000000|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(59324.4289e23))
+			},
+		},
+		{
+			Name:   "pos small",
+			Output: "test_key:+0.00000000000000000059324427|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(59324.4289e-23))
+			},
+		},
+		{
+			Name:   "uint8",
+			Output: "test_key:+252|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, byte(252))
+			},
+		},
+		{
+			Name:   "neg int64",
+			Output: "test_key:-9942423|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, int64(-9942423))
+			},
+		},
+		{
+			Name:   "uint 0",
+			Output: "test_key:+0|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, uint(0))
+			},
+		},
+		{
+			Name:   "pos max float64",
+			Output: "test_key:+179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, math.MaxFloat64)
+			},
+		},
+		{
+			Name:   "neg max float64",
+			Output: "test_key:-179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, -math.MaxFloat64)
+			},
+		},
+		{
+			Name:   "pos inf float64",
+			Output: "test_key:+Inf|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, math.Inf(1))
+			},
+		},
+		{
+			Name:   "neg inf float64",
+			Output: "test_key:-Inf|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, math.Inf(-1))
+			},
+		},
+		{
+			Name:   "pos inf float32",
+			Output: "test_key:+Inf|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(math.Inf(1)))
+			},
+		},
+		{
+			Name:   "neg inf float32",
+			Output: "test_key:-Inf|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(math.Inf(-1)))
+			},
+		},
+		{
+			Name:   "nan float64",
+			Output: "test_key:+NaN|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, math.NaN())
+			},
+		},
+		{
+			Name:   "nan float32",
+			Output: "test_key:+NaN|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, float32(math.NaN()))
+			},
+		},
+		{
+			Name:   "unsupported",
+			Output: "test_key:+|g",
+			Input: func(c *Client) {
+				c.GaugeRelative(testKey, struct{}{})
+			},
+		},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			testOutput(t, tc.Output, tc.Input)
+		})
+	}
 }
 
 func TestTiming(t *testing.T) {
@@ -141,6 +307,7 @@ func TestMute(t *testing.T) {
 	}
 	c.Increment(testKey)
 	c.Gauge(testKey, 1)
+	c.GaugeRelative(testKey, 1)
 	c.Timing(testKey, 1)
 	c.Histogram(testKey, 1)
 	c.Unique(testKey, "1")

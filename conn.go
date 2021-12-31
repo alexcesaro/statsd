@@ -1,8 +1,8 @@
 package statsd
 
 import (
-	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net"
 	"strconv"
@@ -134,13 +134,14 @@ func (c *conn) gaugeRelative(prefix, bucket string, value interface{}, tags stri
 	c.mu.Lock()
 	l := len(c.buf)
 	c.appendBucket(prefix, bucket, tags)
-	if isNegative(value) {
-		c.appendNumber(value)
-	} else {
-		c.appendString(fmt.Sprintf("+%v", value))
+	// add a (positive) sign if necessary (if there's no negative sign)
+	// this is complicated by the special case of negative zero (IEEE-754 floating point thing)
+	// note that NaN ends up "+NaN" and invalid values end up "+" (both probably going to do nothing / error)
+	if f, ok := floatValue(value); (!ok && !isNegativeInteger(value)) ||
+		(ok && (f != f || (f == 0 && !math.Signbit(f)) || (f > 0 && f <= math.MaxFloat64))) {
+		c.appendByte('+')
 	}
-	c.appendType("g")
-	c.closeMetric(tags)
+	c.appendGauge(value, tags)
 	c.flushIfNecessary(l)
 	c.mu.Unlock()
 }
@@ -150,7 +151,14 @@ func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	l := len(c.buf)
 	// To set a gauge to a negative value we must first set it to 0.
 	// https://github.com/etsy/statsd/blob/master/docs/metric_types.md#gauges
-	if isNegative(value) {
+	// the presence of a sign (/^[-+]/) requires the special case handling
+	// https://github.com/statsd/statsd/blob/2041f6fb5e64bbf779a8bcb3e9729e63fe207e2f/stats.js#L307
+	// +Inf doesn't get this special case, no particular reason, it's just existing behavior
+	if f, ok := floatValue(value); ok && f == 0 {
+		// special case to handle negative zero (IEEE-754 floating point thing)
+		value = 0
+	} else if (ok && f < 0) || (!ok && isNegativeInteger(value)) {
+		// note this case includes -Inf, which is just existing behavior that's been retained
 		c.appendBucket(prefix, bucket, tags)
 		c.appendGauge(0, tags)
 	}
@@ -214,8 +222,8 @@ func (c *conn) appendNumber(v interface{}) {
 	}
 }
 
-func isNegative(v interface{}) bool {
-	switch n := v.(type) {
+func isNegativeInteger(n interface{}) bool {
+	switch n := n.(type) {
 	case int:
 		return n < 0
 	case int64:
@@ -226,12 +234,20 @@ func isNegative(v interface{}) bool {
 		return n < 0
 	case int8:
 		return n < 0
-	case float64:
-		return n < 0
-	case float32:
-		return n < 0
+	default:
+		return false
 	}
-	return false
+}
+
+func floatValue(n interface{}) (float64, bool) {
+	switch n := n.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	default:
+		return 0, false
+	}
 }
 
 func (c *conn) appendBucket(prefix, bucket string, tags string) {

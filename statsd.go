@@ -103,7 +103,7 @@ func (c *Client) Gauge(bucket string, value interface{}) {
 	c.conn.gauge(c.prefix, bucket, value, c.tags)
 }
 
-// GaugeRelative records an relative value for the given bucket.
+// GaugeRelative records a relative value for the given bucket.
 func (c *Client) GaugeRelative(bucket string, value interface{}) {
 	if c.skip() {
 		return
