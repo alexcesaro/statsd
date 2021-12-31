@@ -21,7 +21,8 @@ See also the [upstream changelog](CHANGELOG.md).
 ---
 
 # statsd
-[![Build Status](https://travis-ci.org/alexcesaro/statsd.svg?branch=v2)](https://travis-ci.org/alexcesaro/statsd) [![Code Coverage](http://gocover.io/_badge/gopkg.in/alexcesaro/statsd.v2)](http://gocover.io/gopkg.in/alexcesaro/statsd.v2) [![Documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2?status.svg)](https://godoc.org/gopkg.in/alexcesaro/statsd.v2)
+[![Code Coverage](https://gocover.io/_badge/github.com/joeycumines/statsd)](https://gocover.io/github.com/joeycumines/statsd)
+[![Documentation](https://godoc.org/github.com/joeycumines/statsd?status.svg)](https://godoc.org/github.com/joeycumines/statsd)
 
 ## Introduction
 
@@ -44,7 +45,7 @@ with other Go StatsD clients.
 
 ## Documentation
 
-https://godoc.org/gopkg.in/alexcesaro/statsd.v2
+https://pkg.go.dev/github.com/joeycumines/statsd#section-documentation
 
 
 ## Download
@@ -54,7 +55,7 @@ https://godoc.org/gopkg.in/alexcesaro/statsd.v2
 
 ## Example
 
-See the [examples in the documentation](https://godoc.org/gopkg.in/alexcesaro/statsd.v2#example-package).
+See the [examples in the documentation](https://pkg.go.dev/github.com/joeycumines/statsd#pkg-examples).
 
 
 ## License
