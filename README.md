@@ -16,6 +16,8 @@ Note that this repository is versioned independently of the (unmaintained) upstr
 
 * 2019-05-26 - Fixed bug causing trailing newlines to be removed for streaming (non-udp) connections
 
+See also the [upstream changelog](CHANGELOG.md).
+
 ---
 
 # statsd
