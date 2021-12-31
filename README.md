@@ -4,15 +4,17 @@ Note that this repository is versioned independently of the (unmaintained) upstr
 
 **Changelog**
 
+* 2021-12-31 - Added support for disabling the initial ping/check for UDP connections via new `UDPCheck` option
+
 * 2020-11-13 - Added support for go modules
 
 * 2020-11-13 - Added the SafeConn write closer that checks if the connection is still up before attempting to write
 
-* 2020-08-27 - Fixed bug in `statsd.Tags` identified by https://github.com/alexcesaro/statsd/issues/41
+* 2020-08-27 - Fixed bug in `Tags` identified by https://github.com/alexcesaro/statsd/issues/41
 
-* 2019-05-22 - Added support for arbitrary output streams via new `statsd.WriteCloser` option
+* 2019-05-22 - Added support for arbitrary output streams via new `WriteCloser` option
 
-* 2019-05-22 - Added support for simplified inline flush logic via new `statsd.InlineFlush` option
+* 2019-05-22 - Added support for simplified inline flush logic via new `InlineFlush` option
 
 * 2019-05-26 - Fixed bug causing trailing newlines to be removed for streaming (non-udp) connections
 
