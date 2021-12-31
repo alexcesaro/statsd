@@ -39,6 +39,13 @@ func TestGauge(t *testing.T) {
 	})
 }
 
+func TestGaugeRelative(t *testing.T) {
+	testOutput(t, "test_key:+5|g\ntest_key:-10|g", func(c *Client) {
+		c.GaugeRelative(testKey, 5)
+		c.GaugeRelative(testKey, -10)
+	})
+}
+
 func TestTiming(t *testing.T) {
 	testOutput(t, "test_key:6|ms", func(c *Client) {
 		c.Timing(testKey, 6)
