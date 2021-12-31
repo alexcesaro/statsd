@@ -4,7 +4,7 @@ Note that this repository is versioned independently of the (unmaintained) upstr
 
 **Changelog**
 
-* 2022-01-01 - Added support for relative gauges via `GaugeRelative`, and fixed gauge handling of negative zero floats
+* 2022-01-01 - Added support for relative gauges via `Client.GaugeRelative`, and fixed gauge handling of -0 floats
 
 * 2021-12-31 - Added support for disabling the initial ping/check for UDP connections via new `UDPCheck` option
 
