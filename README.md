@@ -4,6 +4,8 @@ Note that this repository is versioned independently of the (unmaintained) upstr
 
 **Changelog**
 
+* 2022-01-01 - Added support for relative gauges via `GaugeRelative`, and fixed gauge handling of negative zero floats
+
 * 2021-12-31 - Added support for disabling the initial ping/check for UDP connections via new `UDPCheck` option
 
 * 2020-11-13 - Added support for go modules
