@@ -2,6 +2,7 @@ package statsd
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"time"
 )
@@ -18,6 +19,7 @@ type clientConfig struct {
 	Tags   []tag
 }
 
+// connConfig is used by New, to initialise a conn
 type connConfig struct {
 	Addr          string
 	ErrorHandler  func(error)
@@ -25,6 +27,9 @@ type connConfig struct {
 	MaxPacketSize int
 	Network       string
 	TagFormat     TagFormat
+	WriteCloser   io.WriteCloser
+	InlineFlush   bool
+	UDPCheck      bool
 }
 
 // An Option represents an option for a Client. It must be used as an
@@ -52,7 +57,7 @@ func ErrorHandler(h func(error)) Option {
 }
 
 // FlushPeriod sets how often the Client's buffer is flushed. If p is 0, the
-// goroutine that periodically flush the buffer is not lauched and the buffer
+// goroutine that periodically flush the buffer is not launched and the buffer
 // is only flushed when it is full.
 //
 // By default, the flush period is 100 ms.  This option is ignored in
@@ -84,8 +89,49 @@ func Network(network string) Option {
 	})
 }
 
+// WriteCloser sets the connection writer used by the client. If this option is
+// present it will take precedence over the Network and Address options. If the
+// client is muted then the writer will be closed before returning. The writer
+// will be closed on Client.Close. Multiples of this option will cause the last
+// writer to be used (if any), and previously provided writers to be closed.
+//
+// This option is ignored in Client.Clone().
+func WriteCloser(writer io.WriteCloser) Option {
+	return func(c *config) {
+		if c.Conn.WriteCloser != nil {
+			_ = c.Conn.WriteCloser.Close()
+		}
+		c.Conn.WriteCloser = writer
+	}
+}
+
+// InlineFlush enables or disables (default disabled) forced flushing, inline
+// with recording each stat. This option takes precedence over FlushPeriod,
+// which would be redundant if always flushing after each write. Note that
+// this DOES NOT guarantee exactly one line per write.
+//
+// This option is ignored in Client.Clone().
+func InlineFlush(enabled bool) Option {
+	return func(c *config) {
+		c.Conn.InlineFlush = enabled
+	}
+}
+
+// UDPCheck enables or disables (default enabled) checking UDP connections, as
+// part of New. This behavior is useful, as it makes it easier to quickly
+// identify misconfigured services. Disabling this option removes the need to
+// explicitly manage the connection state, at the cost of error visibility.
+// Using an error handler may mitigate some of this cost.
+//
+// This option is ignored in Client.Clone().
+func UDPCheck(enabled bool) Option {
+	return func(c *config) {
+		c.Conn.UDPCheck = enabled
+	}
+}
+
 // Mute sets whether the Client is muted. All methods of a muted Client do
-// nothing and return immedialtly.
+// nothing and return immediately.
 //
 // This option can be used in Client.Clone() only if the parent Client is not
 // muted. The clones of a muted Client are always muted.
@@ -135,33 +181,19 @@ func Tags(tags ...string) Option {
 	if len(tags)%2 != 0 {
 		panic("statsd: Tags only accepts an even number of arguments")
 	}
-
-	return Option(func(c *config) {
-		if len(tags) == 0 {
-			return
-		}
-
-		newTags := make([]tag, len(tags)/2)
+	return func(c *config) {
+	UpdateLoop:
 		for i := 0; i < len(tags)/2; i++ {
-			newTags[i] = tag{K: tags[2*i], V: tags[2*i+1]}
-		}
-
-		for _, newTag := range newTags {
-			exists := false
-			for _, oldTag := range c.Client.Tags {
+			newTag := tag{K: tags[2*i], V: tags[2*i+1]}
+			for i, oldTag := range c.Client.Tags {
 				if newTag.K == oldTag.K {
-					exists = true
-					oldTag.V = newTag.V
+					c.Client.Tags[i] = newTag
+					continue UpdateLoop
 				}
 			}
-			if !exists {
-				c.Client.Tags = append(c.Client.Tags, tag{
-					K: newTag.K,
-					V: newTag.V,
-				})
-			}
+			c.Client.Tags = append(c.Client.Tags, newTag)
 		}
-	})
+	}
 }
 
 type tag struct {

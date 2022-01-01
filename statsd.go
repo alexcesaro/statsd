@@ -11,7 +11,9 @@ type Client struct {
 	tags   string
 }
 
-// New returns a new Client.
+// New returns a new Client, which will always be non-nil, but will be muted
+// (permanently inert / stubbed) if returned with an error, or if the Mute
+// option was set.
 func New(opts ...Option) (*Client, error) {
 	// The default configuration.
 	conf := &config{
@@ -25,6 +27,7 @@ func New(opts ...Option) (*Client, error) {
 			// Ethernet MTU - IPv6 Header - TCP Header = 1500 - 40 - 20 = 1440
 			MaxPacketSize: 1440,
 			Network:       "udp",
+			UDPCheck:      true,
 		},
 	}
 	for _, o := range opts {
@@ -87,7 +90,7 @@ func (c *Client) skip() bool {
 	return c.muted || (c.rate != 1 && randFloat() > c.rate)
 }
 
-// Increment increment the given bucket. It is equivalent to Count(bucket, 1).
+// Increment increments the given bucket. It is equivalent to Count(bucket, 1).
 func (c *Client) Increment(bucket string) {
 	c.Count(bucket, 1)
 }
@@ -100,6 +103,14 @@ func (c *Client) Gauge(bucket string, value interface{}) {
 	c.conn.gauge(c.prefix, bucket, value, c.tags)
 }
 
+// GaugeRelative records a relative value for the given bucket.
+func (c *Client) GaugeRelative(bucket string, value interface{}) {
+	if c.skip() {
+		return
+	}
+	c.conn.gaugeRelative(c.prefix, bucket, value, c.tags)
+}
+
 // Timing sends a timing value to a bucket.
 func (c *Client) Timing(bucket string, value interface{}) {
 	if c.skip() {
@@ -108,7 +119,7 @@ func (c *Client) Timing(bucket string, value interface{}) {
 	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tags)
 }
 
-// Histogram sends an histogram value to a bucket.
+// Histogram sends a histogram value to a bucket.
 func (c *Client) Histogram(bucket string, value interface{}) {
 	if c.skip() {
 		return
@@ -116,7 +127,7 @@ func (c *Client) Histogram(bucket string, value interface{}) {
 	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tags)
 }
 
-// A Timing is an helper object that eases sending timing values.
+// Timing is a helper object that eases sending timing values.
 type Timing struct {
 	start time.Time
 	c     *Client
