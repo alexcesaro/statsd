@@ -1,4 +1,8 @@
 # Change Log
+
+**NOTE:** This is the original change log, from the (unmaintained) upstream.
+Please refer to the [readme](README.md) and Git history, for more recent changes.
+
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 

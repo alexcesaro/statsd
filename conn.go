@@ -2,9 +2,11 @@ package statsd
 
 import (
 	"io"
+	"math"
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -51,7 +53,7 @@ func newConn(conf connConfig, muted bool) (*conn, error) {
 
 	// initialise writer if not provided
 	if c.w == nil {
-		if err := c.connect(conf.Network, conf.Addr); err != nil {
+		if err := c.connect(conf.Network, conf.Addr, conf.UDPCheck); err != nil {
 			return c, err
 		}
 	}
@@ -86,28 +88,33 @@ func (c *conn) flushWorker() {
 	}
 }
 
-func (c *conn) connect(network string, address string) error {
+func (c *conn) connect(network string, address string, UDPCheck bool) error {
 	var err error
 	c.w, err = dialTimeout(network, address, 5*time.Second)
 	if err != nil {
 		return err
 	}
 
-	if network[:3] == "udp" {
+	if strings.HasPrefix(network, "udp") {
 		// udp retains behavior from the original implementation where it would strip a trailing newline
 		c.trimTrailingNewline = true
 
 		// When using UDP do a quick check to see if something is listening on the
 		// given port to return an error as soon as possible.
-		for i := 0; i < 2; i++ {
-			_, err = c.w.Write(nil)
-			if err != nil {
-				_ = c.w.Close()
-				c.w = nil
-				return err
+		//
+		// See also doc for UDPCheck option (factory func) and https://github.com/alexcesaro/statsd/issues/6
+		if UDPCheck {
+			for i := 0; i < 2; i++ {
+				_, err = c.w.Write(nil)
+				if err != nil {
+					_ = c.w.Close()
+					c.w = nil
+					return err
+				}
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -123,12 +130,35 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.mu.Unlock()
 }
 
+func (c *conn) gaugeRelative(prefix, bucket string, value interface{}, tags string) {
+	c.mu.Lock()
+	l := len(c.buf)
+	c.appendBucket(prefix, bucket, tags)
+	// add a (positive) sign if necessary (if there's no negative sign)
+	// this is complicated by the special case of negative zero (IEEE-754 floating point thing)
+	// note that NaN ends up "+NaN" and invalid values end up "+" (both probably going to do nothing / error)
+	if f, ok := floatValue(value); (!ok && !isNegativeInteger(value)) ||
+		(ok && (f != f || (f == 0 && !math.Signbit(f)) || (f > 0 && f <= math.MaxFloat64))) {
+		c.appendByte('+')
+	}
+	c.appendGauge(value, tags)
+	c.flushIfNecessary(l)
+	c.mu.Unlock()
+}
+
 func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	c.mu.Lock()
 	l := len(c.buf)
 	// To set a gauge to a negative value we must first set it to 0.
 	// https://github.com/etsy/statsd/blob/master/docs/metric_types.md#gauges
-	if isNegative(value) {
+	// the presence of a sign (/^[-+]/) requires the special case handling
+	// https://github.com/statsd/statsd/blob/2041f6fb5e64bbf779a8bcb3e9729e63fe207e2f/stats.js#L307
+	// +Inf doesn't get this special case, no particular reason, it's just existing behavior
+	if f, ok := floatValue(value); ok && f == 0 {
+		// special case to handle negative zero (IEEE-754 floating point thing)
+		value = 0
+	} else if (ok && f < 0) || (!ok && isNegativeInteger(value)) {
+		// note this case includes -Inf, which is just existing behavior that's been retained
 		c.appendBucket(prefix, bucket, tags)
 		c.appendGauge(0, tags)
 	}
@@ -192,34 +222,32 @@ func (c *conn) appendNumber(v interface{}) {
 	}
 }
 
-func isNegative(v interface{}) bool {
-	switch n := v.(type) {
+func isNegativeInteger(n interface{}) bool {
+	switch n := n.(type) {
 	case int:
-		return n < 0
-	case uint:
 		return n < 0
 	case int64:
 		return n < 0
-	case uint64:
-		return n < 0
 	case int32:
-		return n < 0
-	case uint32:
 		return n < 0
 	case int16:
 		return n < 0
-	case uint16:
-		return n < 0
 	case int8:
 		return n < 0
-	case uint8:
-		return n < 0
-	case float64:
-		return n < 0
-	case float32:
-		return n < 0
+	default:
+		return false
 	}
-	return false
+}
+
+func floatValue(n interface{}) (float64, bool) {
+	switch n := n.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	default:
+		return 0, false
+	}
 }
 
 func (c *conn) appendBucket(prefix, bucket string, tags string) {

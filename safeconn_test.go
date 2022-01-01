@@ -1,6 +1,7 @@
 package statsd
 
 import (
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -119,5 +120,105 @@ func TestSafeConn_SuccessfullyWritesWhenConnectionOpen(t *testing.T) {
 	_, err := s.Write(p)
 	if err != nil {
 		t.Errorf("Error should have been nil, but instead it was: %v", err)
+	}
+}
+
+func TestNewSafeConnWithDefaultTimeouts(t *testing.T) {
+	for _, tc := range [...]struct {
+		Name string
+		Conn net.Conn
+		Err  error
+	}{
+		{
+			Name: `failure`,
+			Err:  errors.New(`some error`),
+		},
+		{
+			Name: `success`,
+			Conn: new(mockNetConn),
+		},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			type (
+				DialIn struct {
+					Network string
+					Address string
+					Timeout time.Duration
+				}
+				DialOut struct {
+					Conn net.Conn
+					Err  error
+				}
+			)
+			var (
+				dialIn  = make(chan DialIn)
+				dialOut = make(chan DialOut)
+			)
+			defer close(dialIn)
+			defer close(dialOut)
+			defer func() func() {
+				old := dialTimeout
+				dialTimeout = func(network, address string, timeout time.Duration) (net.Conn, error) {
+					dialIn <- DialIn{network, address, timeout}
+					v := <-dialOut
+					return v.Conn, v.Err
+				}
+				return func() { dialTimeout = old }
+			}()()
+
+			const (
+				expectedNetwork = `tcp`
+				expectedAddress = `127.0.0.1:21969`
+			)
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				if v := <-dialIn; v != (DialIn{Network: expectedNetwork, Address: expectedAddress, Timeout: defaultConnTimeout}) {
+					t.Errorf("%+v", v)
+				}
+				dialOut <- DialOut{tc.Conn, tc.Err}
+			}()
+
+			conn, err := NewSafeConnWithDefaultTimeouts(expectedNetwork, expectedAddress)
+			if err != tc.Err {
+				t.Error(conn, err)
+			}
+			if (tc.Conn == nil) != (conn == nil) {
+				t.Error(conn)
+			} else if conn != nil {
+				if conn.netConn != tc.Conn {
+					t.Error(conn.netConn)
+				}
+				if conn.connTimeout != defaultConnTimeout {
+					t.Error(conn.connTimeout)
+				}
+				if conn.readTimeout != defaultReadTimeout {
+					t.Error(conn.readTimeout)
+				}
+			}
+
+			<-done
+		})
+	}
+}
+
+func TestSafeConn_Close(t *testing.T) {
+	a, b := net.Pipe()
+	conn := SafeConn{
+		netConn:     a,
+		readTimeout: 1,
+	}
+	if conn.connIsClosed() {
+		t.Error()
+	}
+	if err := (&SafeConn{netConn: b}).Close(); err != nil {
+		t.Error(err)
+	}
+	if !conn.connIsClosed() {
+		t.Error()
+	}
+	if err := conn.Close(); err != nil {
+		t.Error(err)
 	}
 }
